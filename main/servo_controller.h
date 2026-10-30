@@ -42,40 +42,66 @@ public:
 
         current_angle_ = 90.0f;
         target_angle_ = 90.0f;
+        step_speed_ = 1.0f;
         ApplyHardwareAngle(90.0f);
 
-        // Smooth movement task create karo
         xTaskCreate([](void* arg) {
             static_cast<ServoController*>(arg)->SmoothTask();
         }, "servo_smooth", 2048, this, 3, nullptr);
     }
 
-    // Direct jump nahi, target set hoga aur task smoothly le jayega
-    void SetAngle(float angle) {
-        if (angle < 45.0f) angle = 45.0f;
-        if (angle > 135.0f) angle = 135.0f;
+    void SetTarget(float angle, float speed = 1.0f) {
+        if (angle < 50.0f) angle = 50.0f;
+        if (angle > 130.0f) angle = 130.0f;
         target_angle_ = angle;
+        step_speed_ = speed;
     }
 
-    // Natural Idle Glance (Thoda zyada aur natural movement)
+    // Natural Idle: kabhi aage-peeche dheere se dekhna, kabhi thoda der rukna
     void OnIdleTick() {
         int r = esp_random() % 100;
-        if (r < 30) {
-            float target = 65.0f + (esp_random() % 51); // 65 se 115 degrees
-            SetAngle(target);
+        if (r < 15) {
+            // Soft random glance
+            float target = 72.0f + (esp_random() % 37); // 72 to 108 deg
+            SetTarget(target, 0.6f); // Ekdum dheere aur calm glance
+        } else if (r < 25) {
+            // Wapas center aana
+            SetTarget(90.0f, 0.8f);
         }
     }
 
-    // Listening par seedha center focus
+    // Sunte waqt direct user ki taraf center me dekhna
     void OnListening() {
-        SetAngle(90.0f);
+        SetTarget(90.0f, 1.5f);
     }
 
-    // Speaking ke time broad and expressive tilt
+    // Bolte waqt realistic talking gestures (No repetitive left-right)
     void OnSpeakingTick() {
-        static bool toggle = false;
-        toggle = !toggle;
-        SetAngle(toggle ? 68.0f : 112.0f);
+        static int action_cooldown = 0;
+        if (action_cooldown > 0) {
+            action_cooldown--;
+            return;
+        }
+
+        int r = esp_random() % 100;
+        if (r < 35) {
+            // Halka sa left tilt aur hold
+            SetTarget(78.0f + (esp_random() % 7), 1.2f);
+            action_cooldown = 1; // 1-2 second hold karega
+        } else if (r < 70) {
+            // Halka sa right tilt aur hold
+            SetTarget(95.0f + (esp_random() % 7), 1.2f);
+            action_cooldown = 1;
+        } else if (r < 85) {
+            // Ek bada curious tilt
+            float tilt = (esp_random() % 2 == 0) ? 66.0f : 114.0f;
+            SetTarget(tilt, 1.6f);
+            action_cooldown = 2; // Zyada der rukega
+        } else {
+            // Natural center pause
+            SetTarget(90.0f, 1.0f);
+            action_cooldown = 1;
+        }
     }
 
 private:
@@ -83,6 +109,7 @@ private:
 
     float current_angle_ = 90.0f;
     float target_angle_ = 90.0f;
+    float step_speed_ = 1.0f;
 
     void ApplyHardwareAngle(float angle) {
         float pulse_us = 500.0f + (angle / 180.0f) * 2000.0f;
@@ -94,17 +121,15 @@ private:
     void SmoothTask() {
         while (true) {
             float diff = target_angle_ - current_angle_;
-            if (std::abs(diff) > 0.5f) {
-                // Har 20ms me 1.5 degree ka smooth step
-                float step = 1.5f;
-                if (std::abs(diff) < step) {
+            if (std::abs(diff) > 0.3f) {
+                if (std::abs(diff) < step_speed_) {
                     current_angle_ = target_angle_;
                 } else {
-                    current_angle_ += (diff > 0) ? step : -step;
+                    current_angle_ += (diff > 0) ? step_speed_ : -step_speed_;
                 }
                 ApplyHardwareAngle(current_angle_);
             }
-            vTaskDelay(pdMS_TO_TICKS(20)); // 50 updates per second
+            vTaskDelay(pdMS_TO_TICKS(20));
         }
     }
 };
