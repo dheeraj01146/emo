@@ -8,30 +8,29 @@
 inline void RunEmoBootAnimation(Display* display) {
     if (!display) return;
 
-    // 1. Lock LVGL display
+    // 1. Lock LVGL display & create Fullscreen Pure Black Screen
     lvgl_port_lock(0);
 
-    // Fullscreen Pure Black Background container
     lv_obj_t* boot_screen = lv_obj_create(lv_layer_top());
     lv_obj_set_size(boot_screen, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_bg_color(boot_screen, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(boot_screen, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(boot_screen, 0, 0);
     lv_obj_set_style_radius(boot_screen, 0, 0);
-    lv_obj_set_style_pad_all(boot_screen, 15, 0);
+    lv_obj_set_style_pad_all(boot_screen, 16, 0);
     lv_obj_clear_flag(boot_screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Label for Terminal Logs
-    lv_obj_t* label = lv_label_create(boot_screen);
-    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0); // Pure White Retro Text
-    lv_obj_align(label, LV_ALIGN_TOP_LEFT, 0, 10);
-    lv_label_set_text(label, "");
+    // Terminal Diagnostics Text Object
+    lv_obj_t* log_label = lv_label_create(boot_screen);
+    lv_obj_set_style_text_color(log_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(log_label, LV_ALIGN_TOP_LEFT, 0, 10);
+    lv_label_set_text(log_label, "");
 
     lvgl_port_unlock();
 
-    // 2. Line-by-Line Terminal Checks (Retro Cyberpunk)
+    // 2. Slow & Heavy Terminal Hardware Checks
     const char* boot_lines[] = {
-        "> BOOTING EMO CORE...\n",
+        "> INITIALIZING EMO CORE...\n",
         "> RAM [8MB PSRAM] ........ [ OK ]\n",
         "> DISPLAY SUBSYSTEM ...... [ OK ]\n",
         "> ENGINE SIMULATOR ....... [ OK ]\n",
@@ -43,39 +42,78 @@ inline void RunEmoBootAnimation(Display* display) {
     for (int i = 0; i < 6; i++) {
         strcat(log_buffer, boot_lines[i]);
         lvgl_port_lock(0);
-        lv_label_set_text(label, log_buffer);
+        lv_label_set_text(log_label, log_buffer);
         lvgl_port_unlock();
-        vTaskDelay(pdMS_TO_TICKS(180));
+        vTaskDelay(pdMS_TO_TICKS(650)); // Slow readable terminal line pacing
     }
-    vTaskDelay(pdMS_TO_TICKS(400));
+    
+    // Hold completed checks on screen for 1.2 seconds
+    vTaskDelay(pdMS_TO_TICKS(1200));
 
-    // 3. Clear Screen for Samsung-Style Centered Wave
+    // 3. Clear Screen & Prepare Smartphone Center Logo + Bottom Branding
     lvgl_port_lock(0);
     lv_obj_clean(boot_screen);
 
-    lv_obj_t* live_label = lv_label_create(boot_screen);
-    lv_obj_set_style_text_color(live_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_align(live_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(live_label, "EMO IS LIVE\nRIGHT NOW");
-    lv_obj_align(live_label, LV_ALIGN_CENTER, 0, 0);
+    // Center Big Logo: EMO AI ROBOT
+    lv_obj_t* center_logo = lv_label_create(boot_screen);
+    lv_obj_set_style_text_color(center_logo, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_align(center_logo, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(center_logo, "E M O\nAI ROBOT");
+    lv_obj_align(center_logo, LV_ALIGN_CENTER, 0, -25);
+    lv_obj_set_style_text_opa(center_logo, 0, 0); // Start hidden for smooth fade-in
+
+    // Bottom Branding: powered by DHEERAJ
+    lv_obj_t* bottom_brand = lv_label_create(boot_screen);
+    lv_obj_set_style_text_color(bottom_brand, lv_color_hex(0x999999), 0); // Subtle metallic grey
+    lv_obj_set_style_text_align(bottom_brand, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(bottom_brand, "powered by\nD H E E R A J");
+    lv_obj_align(bottom_brand, LV_ALIGN_BOTTOM_MID, 0, -18);
+    lv_obj_set_style_text_opa(bottom_brand, 0, 0); // Start hidden
+
     lvgl_port_unlock();
+    vTaskDelay(pdMS_TO_TICKS(500)); // Suspense pause in pitch dark
 
-    // Breathing / Shimmer Wave Effect
-    for (int step = 0; step < 4; step++) {
-        lvgl_port_lock(0);
-        if (step % 2 == 0) {
-            lv_obj_align(live_label, LV_ALIGN_CENTER, 0, -4);
-            lv_obj_set_style_text_opa(live_label, LV_OPA_COVER, 0);
-        } else {
-            lv_obj_align(live_label, LV_ALIGN_CENTER, 0, 4);
-            lv_obj_set_style_text_opa(live_label, LV_OPA_70, 0);
+    // 4. Ultra Smooth Honor 7C Breathing Wave (Slow Pulses)
+    for (int cycle = 0; cycle < 2; cycle++) {
+        // Slow Smooth Fade-In
+        for (int opa = 20; opa <= 255; opa += 15) {
+            lvgl_port_lock(0);
+            lv_obj_set_style_text_opa(center_logo, opa, 0);
+            lv_obj_set_style_text_opa(bottom_brand, (opa * 8) / 10, 0);
+            lvgl_port_unlock();
+            vTaskDelay(pdMS_TO_TICKS(70)); // Butter smooth frame rate
         }
-        lvgl_port_unlock();
-        vTaskDelay(pdMS_TO_TICKS(220));
-    }
-    vTaskDelay(pdMS_TO_TICKS(300));
+        
+        // Full Glow Hold at Peak
+        vTaskDelay(pdMS_TO_TICKS(800));
 
-    // 4. Destroy Boot Screen & Transition to EMO Face
+        // Slow Subtle Dim
+        for (int opa = 255; opa >= 90; opa -= 15) {
+            lvgl_port_lock(0);
+            lv_obj_set_style_text_opa(center_logo, opa, 0);
+            lv_obj_set_style_text_opa(bottom_brand, (opa * 8) / 10, 0);
+            lvgl_port_unlock();
+            vTaskDelay(pdMS_TO_TICKS(70));
+        }
+        vTaskDelay(pdMS_TO_TICKS(350));
+    }
+
+    // 5. Final Full Bright Presentation (Holds for 2.2 seconds like a real device boot)
+    lvgl_port_lock(0);
+    lv_obj_set_style_text_opa(center_logo, LV_OPA_COVER, 0);
+    lv_obj_set_style_text_opa(bottom_brand, LV_OPA_COVER, 0);
+    lvgl_port_unlock();
+    vTaskDelay(pdMS_TO_TICKS(2200));
+
+    // 6. Smooth Fade to Dark & Clean Switch to Eyes
+    for (int opa = 255; opa >= 0; opa -= 30) {
+        lvgl_port_lock(0);
+        lv_obj_set_style_text_opa(center_logo, opa, 0);
+        lv_obj_set_style_text_opa(bottom_brand, opa, 0);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(40));
+    }
+
     lvgl_port_lock(0);
     lv_obj_del(boot_screen);
     lvgl_port_unlock();
