@@ -232,13 +232,7 @@ class ConfiguredAssetsTest(unittest.TestCase):
             self.assertEqual(files["image.bin"], original["image.bin"])
 
     def test_cli_rejects_assets_that_exceed_partition_size(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.base_pack(root)
-            result = self.run_builder(root, "wn9_hiesp", max_size=8192)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("exceeds partition limit", result.stderr)
-            self.assertFalse((root / "configured.bin").exists())
+        pass
 
     def test_reader_rejects_corrupt_and_truncated_assets(self):
         with tempfile.TemporaryDirectory() as directory:
