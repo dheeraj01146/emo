@@ -12,6 +12,7 @@
 #include "text_glyph_payload.h"
 #include "websocket_protocol.h"
 #include "servo_controller.h"
+#include "boot_anim.h"
 
 #include <driver/gpio.h>
 #include <esp_log.h>
@@ -367,14 +368,14 @@ void Application::HandleActivationDoneEvent() {
         startup_completed_ = true;
         pending_startup_wake_word_hint_ = !has_error;
     }
-    if (!has_error) {
+   if (!has_error) {
         auto display = Board::GetInstance().GetDisplay();
+        RunEmoBootAnimation(display);
         std::string message = std::string(Lang::Strings::VERSION) + ota_->GetCurrentVersion();
         display->ShowNotification(message.c_str());
-        display->SetChatMessage("system", "");
     }
-
-    // Release OTA object after activation is complete
+  
+ // Release OTA object after activation is complete
     ota_.reset();
     auto& board = Board::GetInstance();
     board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
@@ -466,9 +467,9 @@ void Application::CheckAssetsVersion() {
     // esp_emote_assets packs (320_240, 360_360, 1024_600) declares it, so on every board that
     // uses one this call fails, logs two errors and leaves whatever face was already up.
     // Fall back to an emotion all three packs do declare.
-    if (!display->SetEmotion("robot_2")) {
-        display->SetEmotion("neutral");
-    }
+    //if (!display->SetEmotion("robot_2")) {
+     //   display->SetEmotion("neutral");
+   // }
 }
 
 void Application::CheckNewVersion() {
