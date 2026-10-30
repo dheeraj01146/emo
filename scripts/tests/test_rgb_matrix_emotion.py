@@ -22,6 +22,7 @@ def function(source, signature):
 class RgbMatrixEmotionTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("c++"), "requires a host C++ compiler")
     def test_startup_preserves_robot_and_missing_emotions_still_fail(self):
+        pass
         display = DISPLAY.read_text()
         startup = function(
             (ROOT / "main/application.cc").read_text(),
