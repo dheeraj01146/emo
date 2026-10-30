@@ -235,7 +235,7 @@ class ConfiguredAssetsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.base_pack(root)
-            result = self.run_builder(root, "wn9_hiesp", max_size=100)
+            result = self.run_builder(root, "wn9_hiesp", max_size=8192)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("exceeds partition limit", result.stderr)
             self.assertFalse((root / "configured.bin").exists())
