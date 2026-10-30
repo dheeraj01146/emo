@@ -72,6 +72,7 @@ void Application::Initialize() {
     // Setup the display
     auto display = board.GetDisplay();
     display->SetupUI();
+    RunEmoBootAnimation(display);
     // Print board name/version info
    // display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
 
@@ -370,7 +371,7 @@ void Application::HandleActivationDoneEvent() {
     }
    if (!has_error) {
         auto display = Board::GetInstance().GetDisplay();
-        RunEmoBootAnimation(display);
+       // RunEmoBootAnimation(display);
        // std::string message = std::string(Lang::Strings::VERSION) + ota_->GetCurrentVersion();
       //  display->ShowNotification(message.c_str());
     }
