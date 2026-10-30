@@ -933,20 +933,18 @@ void Application::HandleWakeWordDetectedEvent() {
     } else if (state == kDeviceStateNotifying) {
         StopNotification();
         BeginWakeWordInvoke(wake_word);
-     } else if (state == kDeviceStateSpeaking) {
+  } else if (state == kDeviceStateSpeaking) {
         // Speaking ke time interrupt block karo
         return;
     } else if (state == kDeviceStateListening) {
         AbortSpeaking(kAbortReasonWakeWordDetected);
         while (audio_service_.PopPacketFromSendQueue())
             ;
-            // Re-enable wake word detection as it was stopped by the detection itself
-            audio_service_.EnableWakeWordDetection(true);
-        } else {
-            // Play popup sound and start listening again
-            play_popup_on_listening_ = true;
-            SetListeningMode(GetDefaultListeningMode());
-        }
+
+        protocol_->SendStartListening(GetDefaultListeningMode());
+        audio_service_.ResetDecoder();
+        audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+        audio_service_.EnableWakeWordDetection(true);
     } else if (state == kDeviceStateActivating) {
         // Restart the activation check if the wake word is detected during activation
         SetDeviceState(kDeviceStateIdle);
