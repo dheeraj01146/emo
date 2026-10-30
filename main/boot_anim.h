@@ -8,7 +8,7 @@
 inline void RunEmoBootAnimation(Display* display) {
     if (!display) return;
 
-    // 1. Lock LVGL display & create Fullscreen Pure Black Screen
+    // 1. Fullscreen Pitch Black Canvas
     lvgl_port_lock(0);
 
     lv_obj_t* boot_screen = lv_obj_create(lv_layer_top());
@@ -17,103 +17,106 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_obj_set_style_bg_opa(boot_screen, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(boot_screen, 0, 0);
     lv_obj_set_style_radius(boot_screen, 0, 0);
-    lv_obj_set_style_pad_all(boot_screen, 16, 0);
+    lv_obj_set_style_pad_all(boot_screen, 10, 0);
     lv_obj_clear_flag(boot_screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Terminal Diagnostics Text Object
-    lv_obj_t* log_label = lv_label_create(boot_screen);
-    lv_obj_set_style_text_color(log_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_align(log_label, LV_ALIGN_TOP_LEFT, 0, 10);
-    lv_label_set_text(log_label, "");
+    // Fast edex-ui / Cyber Terminal Label
+    lv_obj_t* term_label = lv_label_create(boot_screen);
+    lv_obj_set_style_text_color(term_label, lv_color_hex(0x00FF66), 0); // Hacker Neon Green
+    lv_obj_align(term_label, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_label_set_text(term_label, "");
 
     lvgl_port_unlock();
 
-    // 2. Slow & Heavy Terminal Hardware Checks
-    const char* boot_lines[] = {
-        "> INITIALIZING EMO CORE...\n",
-        "> RAM [8MB PSRAM] ........ [ OK ]\n",
-        "> DISPLAY SUBSYSTEM ...... [ OK ]\n",
-        "> ENGINE SIMULATOR ....... [ OK ]\n",
-        "> HARDWARE SERVO ......... [ OK ]\n",
-        "> NETWORK (WIFI) ......... [ CONNECTED ]\n"
+    // 2. edex-ui / Linux Boot Kernel Stream
+    const char* kernel_logs[] = {
+        "[  0.000000] Linux emo-core 5.15.0 #1 SMP PREEMPT\n",
+        "[  0.041210] CPU: Xtensa dual-core ESP32-S3 @ 240MHz\n",
+        "[  0.082400] Memory: 8192KB PSRAM Octal enabled [ OK ]\n",
+        "[  0.134010] DMA: SPI Bounce buffers mounted [ OK ]\n",
+        "[  0.198200] VFS: Loading file system partitions [ OK ]\n",
+        "[  0.254100] net_core: scanning 802.11 b/g/n interfaces\n",
+        "[  0.312000] wlan0: carrier connected to JIO SMART HOME\n",
+        "[  0.370000] net_core: IPv4 address assigned [ OK ]\n",
+        "[  0.428100] audio: I2S MAX98357A + INMP441 [ READY ]\n",
+        "[  0.490000] systemd[1]: Reached target Graphical Interface.\n",
+        "[  0.550000] emo_daemon: hardware handshake [ CONNECTED ]\n"
     };
 
-    char log_buffer[512] = "";
-    for (int i = 0; i < 6; i++) {
-        strcat(log_buffer, boot_lines[i]);
+    char log_stream[768] = "";
+    for (int i = 0; i < 11; i++) {
+        strcat(log_stream, kernel_logs[i]);
         lvgl_port_lock(0);
-        lv_label_set_text(log_label, log_buffer);
+        lv_label_set_text(term_label, log_stream);
         lvgl_port_unlock();
-        vTaskDelay(pdMS_TO_TICKS(650)); // Slow readable terminal line pacing
+        vTaskDelay(pdMS_TO_TICKS(110)); // Rapid stream effect
     }
-    
-    // Hold completed checks on screen for 1.2 seconds
-    vTaskDelay(pdMS_TO_TICKS(1200));
+    vTaskDelay(pdMS_TO_TICKS(800));
 
-    // 3. Clear Screen & Prepare Smartphone Center Logo + Bottom Branding
+    // 3. Clear Screen for Huawei / HarmonyOS Style Reveal
     lvgl_port_lock(0);
     lv_obj_clean(boot_screen);
 
-    // Center Big Logo: EMO AI ROBOT
-    lv_obj_t* center_logo = lv_label_create(boot_screen);
-    lv_obj_set_style_text_color(center_logo, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_align(center_logo, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(center_logo, "E M O\nAI ROBOT");
-    lv_obj_align(center_logo, LV_ALIGN_CENTER, 0, -25);
-    lv_obj_set_style_text_opa(center_logo, 0, 0); // Start hidden for smooth fade-in
+    // Glowing Halo / Horizon Arc Line
+    lv_obj_t* horizon_glow = lv_obj_create(boot_screen);
+    lv_obj_set_size(horizon_glow, 140, 4);
+    lv_obj_set_style_bg_color(horizon_glow, lv_color_hex(0x00E5FF), 0); // Neon Cyan / Electric Blue
+    lv_obj_set_style_radius(horizon_glow, 2, 0);
+    lv_obj_set_style_border_width(horizon_glow, 0, 0);
+    lv_obj_align(horizon_glow, LV_ALIGN_CENTER, 0, -32);
+    lv_obj_set_style_bg_opa(horizon_glow, 0, 0);
+
+    // Center Hero Logo
+    lv_obj_t* center_title = lv_label_create(boot_screen);
+    lv_obj_set_style_text_color(center_title, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_align(center_title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(center_title, "E M O\nI S   L I V E");
+    lv_obj_align(center_title, LV_ALIGN_CENTER, 0, -10);
+    lv_obj_set_style_text_opa(center_title, 0, 0);
 
     // Bottom Branding: powered by DHEERAJ
     lv_obj_t* bottom_brand = lv_label_create(boot_screen);
-    lv_obj_set_style_text_color(bottom_brand, lv_color_hex(0x999999), 0); // Subtle metallic grey
+    lv_obj_set_style_text_color(bottom_brand, lv_color_hex(0xAAAAAA), 0);
     lv_obj_set_style_text_align(bottom_brand, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(bottom_brand, "powered by\nD H E E R A J");
     lv_obj_align(bottom_brand, LV_ALIGN_BOTTOM_MID, 0, -18);
-    lv_obj_set_style_text_opa(bottom_brand, 0, 0); // Start hidden
+    lv_obj_set_style_text_opa(bottom_brand, 0, 0);
 
     lvgl_port_unlock();
-    vTaskDelay(pdMS_TO_TICKS(500)); // Suspense pause in pitch dark
+    vTaskDelay(pdMS_TO_TICKS(300));
 
-    // 4. Ultra Smooth Honor 7C Breathing Wave (Slow Pulses)
-    for (int cycle = 0; cycle < 2; cycle++) {
-        // Slow Smooth Fade-In
-        for (int opa = 20; opa <= 255; opa += 15) {
-            lvgl_port_lock(0);
-            lv_obj_set_style_text_opa(center_logo, opa, 0);
-            lv_obj_set_style_text_opa(bottom_brand, (opa * 8) / 10, 0);
-            lvgl_port_unlock();
-            vTaskDelay(pdMS_TO_TICKS(70)); // Butter smooth frame rate
-        }
-        
-        // Full Glow Hold at Peak
-        vTaskDelay(pdMS_TO_TICKS(800));
-
-        // Slow Subtle Dim
-        for (int opa = 255; opa >= 90; opa -= 15) {
-            lvgl_port_lock(0);
-            lv_obj_set_style_text_opa(center_logo, opa, 0);
-            lv_obj_set_style_text_opa(bottom_brand, (opa * 8) / 10, 0);
-            lvgl_port_unlock();
-            vTaskDelay(pdMS_TO_TICKS(70));
-        }
-        vTaskDelay(pdMS_TO_TICKS(350));
+    // 4. Huawei Sunrise Horizon Expansion Animation
+    for (int w = 20; w <= 160; w += 10) {
+        lvgl_port_lock(0);
+        lv_obj_set_width(horizon_glow, w);
+        lv_obj_set_style_bg_opa(horizon_glow, LV_OPA_COVER, 0);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(25));
     }
 
-    // 5. Final Full Bright Presentation (Holds for 2.2 seconds like a real device boot)
-    lvgl_port_lock(0);
-    lv_obj_set_style_text_opa(center_logo, LV_OPA_COVER, 0);
-    lv_obj_set_style_text_opa(bottom_brand, LV_OPA_COVER, 0);
-    lvgl_port_unlock();
-    vTaskDelay(pdMS_TO_TICKS(2200));
-
-    // 6. Smooth Fade to Dark & Clean Switch to Eyes
-    for (int opa = 255; opa >= 0; opa -= 30) {
+    // 5. Smooth Text Fade-in & Horizon Pulse
+    for (int opa = 20; opa <= 255; opa += 20) {
         lvgl_port_lock(0);
-        lv_obj_set_style_text_opa(center_logo, opa, 0);
-        lv_obj_set_style_text_opa(bottom_brand, opa, 0);
+        lv_obj_set_style_text_opa(center_title, opa, 0);
+        lv_obj_set_style_text_opa(bottom_brand, (opa * 8) / 10, 0);
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(40));
     }
 
+    // Full Presentation Hold
+    vTaskDelay(pdMS_TO_TICKS(2500));
+
+    // 6. Smooth Fade out to pitch black
+    for (int opa = 255; opa >= 0; opa -= 30) {
+        lvgl_port_lock(0);
+        lv_obj_set_style_text_opa(center_title, opa, 0);
+        lv_obj_set_style_text_opa(bottom_brand, opa, 0);
+        lv_obj_set_style_bg_opa(horizon_glow, opa, 0);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(35));
+    }
+
+    // Cleanup & Return to Eyes
     lvgl_port_lock(0);
     lv_obj_del(boot_screen);
     lvgl_port_unlock();
