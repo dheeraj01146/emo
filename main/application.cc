@@ -11,6 +11,7 @@
 #include "system_info.h"
 #include "text_glyph_payload.h"
 #include "websocket_protocol.h"
+#include "servo_controller.h"
 
 #include <driver/gpio.h>
 #include <esp_log.h>
@@ -77,6 +78,7 @@ void Application::Initialize() {
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
     audio_service_.Start();
+    ServoController::GetInstance().Initialize();
     ESP_LOGI(TAG, "After board/audio init");
     SystemInfo::PrintHeapStats();
 
@@ -285,6 +287,11 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
+            if (GetDeviceState() == kDeviceStateIdle) {
+                ServoController::GetInstance().OnIdleTick();
+            } else if (GetDeviceState() == kDeviceStateSpeaking) {
+                ServoController::GetInstance().OnSpeakingTick();
+            }
 
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
