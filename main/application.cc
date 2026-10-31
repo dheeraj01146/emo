@@ -13,6 +13,7 @@
 #include "websocket_protocol.h"
 #include "servo_controller.h"
 #include "boot_anim.h"
+#include "emo_mood.h"
 
 #include <driver/gpio.h>
 #include <esp_log.h>
@@ -75,7 +76,8 @@ void Application::Initialize() {
     RunEmoBootAnimation(display);
     // Print board name/version info
    // display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
-
+    EmoMoodEngine::GetInstance().Start(display);
+  
     // Setup the audio service
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
@@ -936,7 +938,8 @@ void Application::HandleWakeWordDetectedEvent() {
     auto state = GetDeviceState();
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
-
+    EmoMoodEngine::GetInstance().ResetInteraction("happy"); 
+   
     if (state == kDeviceStateIdle) {
         BeginWakeWordInvoke(wake_word);
     } else if (state == kDeviceStateNotifying) {
