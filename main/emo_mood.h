@@ -56,7 +56,7 @@ private:
 
         // 1. Agar 40 second tak koi na bole -> Bored / Doubt expression
         if (idle_seconds_ == 40) {
-            display_->SetEmotion("doubt");
+            display_->SetEmotion("Sad");
         }
         // 2. Agar 1.5 min tak koi dhyan na de -> Bhookh / Sad face
         else if (hunger_level_ >= 10 && hunger_level_ < 16) {
