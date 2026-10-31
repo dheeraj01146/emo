@@ -51,7 +51,7 @@ public:
 
         // Stage 1: 40 seconds idle -> thoda bored/neutral expression
         if (idle_seconds_ >= 40 && idle_seconds_ < 90) {
-            display_->SetEmotion("neutral");
+            display_->SetEmotion("Funny");
         }
         // Stage 2: 1.5 minutes (90s) tak koi baat nahi -> sad
         else if (idle_seconds_ >= 90 && idle_seconds_ < 150) {
