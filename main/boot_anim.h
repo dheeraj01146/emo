@@ -8,7 +8,7 @@
 inline void RunEmoBootAnimation(Display* display) {
     if (!display) return;
 
-    // 1. Fullscreen Base Canvas (Pitch Black)
+    // 1. Fullscreen Base Canvas
     lvgl_port_lock(0);
 
     lv_obj_t* boot_screen = lv_obj_create(lv_layer_top());
@@ -20,7 +20,7 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_obj_set_style_pad_all(boot_screen, 12, 0);
     lv_obj_clear_flag(boot_screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Green Cyber Terminal Label
+    // Green Cyber Terminal
     lv_obj_t* term_label = lv_label_create(boot_screen);
     lv_obj_set_style_text_color(term_label, lv_color_hex(0x00FF66), 0);
     lv_obj_align(term_label, LV_ALIGN_TOP_LEFT, 0, 0);
@@ -28,7 +28,7 @@ inline void RunEmoBootAnimation(Display* display) {
 
     lvgl_port_unlock();
 
-    // 2. Slow & Relaxed Terminal Checks (No Rush)
+    // 2. Diagnostics Logs (Aaram se padhne ka pace)
     const char* kernel_logs[] = {
         "> INITIALIZING EMO CORE...\n",
         "> RAM [8MB PSRAM] ........ [ OK ]\n",
@@ -44,31 +44,44 @@ inline void RunEmoBootAnimation(Display* display) {
         lvgl_port_lock(0);
         lv_label_set_text(term_label, log_stream);
         lvgl_port_unlock();
-        vTaskDelay(pdMS_TO_TICKS(420)); // Slow readable pace
+        vTaskDelay(pdMS_TO_TICKS(400));
     }
-    vTaskDelay(pdMS_TO_TICKS(1400)); // 1.4 sec hold
+    vTaskDelay(pdMS_TO_TICKS(1200));
 
-    // 3. Clear Screen & Suspense Pause
+    // 3. Clear Screen & Suspense Hold
     lvgl_port_lock(0);
     lv_obj_clean(boot_screen);
     lvgl_port_unlock();
-    vTaskDelay(pdMS_TO_TICKS(900));
+    vTaskDelay(pdMS_TO_TICKS(800));
 
-    // 4. Setup Oppo Style Window Container & Text Elements
+    // 4. Oppo Left & Right Sliding Bars Setup
     lvgl_port_lock(0);
 
-    // Oppo Window Box (Starts as a thin center line/slit)
+    lv_obj_t* left_wing = lv_obj_create(boot_screen);
+    lv_obj_set_size(left_wing, 4, 70);
+    lv_obj_set_style_bg_color(left_wing, lv_color_hex(0x00E5FF), 0); // Neon Cyan
+    lv_obj_set_style_radius(left_wing, 2, 0);
+    lv_obj_set_style_border_width(left_wing, 0, 0);
+    lv_obj_align(left_wing, LV_ALIGN_CENTER, -120, -20); // Left side off-center
+
+    lv_obj_t* right_wing = lv_obj_create(boot_screen);
+    lv_obj_set_size(right_wing, 4, 70);
+    lv_obj_set_style_bg_color(right_wing, lv_color_hex(0x00E5FF), 0);
+    lv_obj_set_style_radius(right_wing, 2, 0);
+    lv_obj_set_style_border_width(right_wing, 0, 0);
+    lv_obj_align(right_wing, LV_ALIGN_CENTER, 120, -20); // Right side off-center
+
+    // Central Oppo Frame Container
     lv_obj_t* oppo_window = lv_obj_create(boot_screen);
-    lv_obj_set_size(oppo_window, 20, 2);
-    lv_obj_align(oppo_window, LV_ALIGN_CENTER, 0, -25);
-    lv_obj_set_style_bg_color(oppo_window, lv_color_hex(0x111118), 0); // Premium dark graphite
-    lv_obj_set_style_bg_opa(oppo_window, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(oppo_window, lv_color_hex(0x00E5FF), 0); // Neon cyan border
-    lv_obj_set_style_border_width(oppo_window, 2, 0);
+    lv_obj_set_size(oppo_window, 10, 70);
+    lv_obj_align(oppo_window, LV_ALIGN_CENTER, 0, -20);
+    lv_obj_set_style_bg_color(oppo_window, lv_color_hex(0x0C0C14), 0);
+    lv_obj_set_style_bg_opa(oppo_window, 0, 0);
+    lv_obj_set_style_border_width(oppo_window, 0, 0);
     lv_obj_set_style_radius(oppo_window, 8, 0);
     lv_obj_clear_flag(oppo_window, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Center Big Logo: EMO AI ROBOT
+    // EMO AI ROBOT Logo
     lv_obj_t* center_logo = lv_label_create(oppo_window);
     lv_obj_set_style_text_color(center_logo, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_align(center_logo, LV_TEXT_ALIGN_CENTER, 0);
@@ -76,7 +89,7 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_obj_align(center_logo, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_text_opa(center_logo, 0, 0);
 
-    // Bottom Branding: powered by DHEERAJ
+    // powered by DHEERAJ
     lv_obj_t* bottom_brand = lv_label_create(boot_screen);
     lv_obj_set_style_text_color(bottom_brand, lv_color_hex(0x999999), 0);
     lv_obj_set_style_text_align(bottom_brand, LV_TEXT_ALIGN_CENTER, 0);
@@ -85,39 +98,52 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_obj_set_style_text_opa(bottom_brand, 0, 0);
 
     lvgl_port_unlock();
-    vTaskDelay(pdMS_TO_TICKS(400));
+    vTaskDelay(pdMS_TO_TICKS(300));
 
-    // 5. Oppo Window Opening Animation (Horizontal Slit expand -> Vertical Window Open)
-    // Step A: Width Expansion (Horizontal Slit opens)
-    for (int w = 20; w <= 180; w += 10) {
+    // 5. Oppo Left-Right Move & Dock Animation
+    // Left & Right lines slide in towards the center
+    for (int offset = 120; offset >= 10; offset -= 8) {
         lvgl_port_lock(0);
-        lv_obj_set_size(oppo_window, w, 3);
+        lv_obj_align(left_wing, LV_ALIGN_CENTER, -offset, -20);
+        lv_obj_align(right_wing, LV_ALIGN_CENTER, offset, -20);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+
+    // 6. Window Open Expansion (Center se dono taraf parde ki tarah khulna)
+    for (int w = 10; w <= 180; w += 10) {
+        lvgl_port_lock(0);
+        lv_obj_set_size(oppo_window, w, 76);
+        lv_obj_set_style_bg_opa(oppo_window, LV_OPA_COVER, 0);
+        // Wings slide outwards pushing the window boundaries
+        lv_obj_align(left_wing, LV_ALIGN_CENTER, -(w / 2), -20);
+        lv_obj_align(right_wing, LV_ALIGN_CENTER, (w / 2), -20);
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(30));
     }
 
-    // Step B: Height Expansion (Window unfolds vertically)
-    for (int h = 3; h <= 95; h += 6) {
-        lvgl_port_lock(0);
-        lv_obj_set_size(oppo_window, 180, h);
-        lvgl_port_unlock();
-        vTaskDelay(pdMS_TO_TICKS(35));
-    }
+    // Border bars fade into window edges smoothly
+    lvgl_port_lock(0);
+    lv_obj_del(left_wing);
+    lv_obj_del(right_wing);
+    lv_obj_set_style_border_color(oppo_window, lv_color_hex(0x00E5FF), 0);
+    lv_obj_set_style_border_width(oppo_window, 2, 0);
+    lvgl_port_unlock();
 
-    // 6. Smooth Reveal of Center Text & Bottom Branding
-    for (int opa = 15; opa <= 255; opa += 15) {
+    // 7. Smooth Slow Fade-in of Logo & Powered By Text
+    for (int opa = 20; opa <= 255; opa += 15) {
         lvgl_port_lock(0);
         lv_obj_set_style_text_opa(center_logo, opa, 0);
         lv_obj_set_style_text_opa(bottom_brand, (opa * 8) / 10, 0);
         lvgl_port_unlock();
-        vTaskDelay(pdMS_TO_TICKS(60)); // Butter smooth slow reveal
+        vTaskDelay(pdMS_TO_TICKS(60));
     }
 
-    // 7. Solid Freeze Hold (Aaram se 3.5 Seconds freeze taaki sir aur sab dekh sakein)
+    // 8. Steady Rock Freeze (3.5 Seconds hold)
     vTaskDelay(pdMS_TO_TICKS(3500));
 
-    // 8. Elegant Window Close / Fade Out
-    for (int opa = 255; opa >= 0; opa -= 20) {
+    // 9. Graceful Curtain Close & Fade Out
+    for (int opa = 255; opa >= 0; opa -= 25) {
         lvgl_port_lock(0);
         lv_obj_set_style_text_opa(center_logo, opa, 0);
         lv_obj_set_style_text_opa(bottom_brand, opa, 0);
@@ -127,7 +153,7 @@ inline void RunEmoBootAnimation(Display* display) {
         vTaskDelay(pdMS_TO_TICKS(40));
     }
 
-    // 9. Cleanup & Return to Neutral Robot Eyes
+    // 10. Cleanup & Switch to EMO
     lvgl_port_lock(0);
     lv_obj_del(boot_screen);
     lvgl_port_unlock();
