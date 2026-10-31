@@ -2,7 +2,7 @@
 
 #include "display.h"
 #include <freertos/FreeRTOS.h>
-#include <freertos/timers.h>
+#include <freertos/task.h>
 #include <esp_log.h>
 #include <atomic>
 
@@ -19,21 +19,20 @@ public:
         display_ = display;
         idle_seconds_ = 0;
 
-        if (timer_handle_ == nullptr) {
-            timer_handle_ = xTimerCreate(
-                "EmoMoodTimer",
-                pdMS_TO_TICKS(10000), // Har 10 second me check karega
-                pdTRUE,
+        if (task_handle_ == nullptr) {
+            xTaskCreatePinnedToCore(
+                [](void* arg) {
+                    auto* engine = static_cast<EmoMoodEngine*>(arg);
+                    engine->RunTaskLoop();
+                },
+                "EmoMoodTask",
+                4096,              // 4KB Safe Stack (Stack Overflow fix)
                 this,
-                [](TimerHandle_t xTimer) {
-                    auto* engine = static_cast<EmoMoodEngine*>(pvTimerGetTimerID(xTimer));
-                    engine->OnTimerTick();
-                }
+                2,                 // Task Priority
+                &task_handle_,
+                1                  // Core 1 par pin
             );
-            if (timer_handle_ != nullptr) {
-                xTimerStart(timer_handle_, 0);
-                ESP_LOGI(MOOD_TAG, "Mood engine started successfully");
-            }
+            ESP_LOGI(MOOD_TAG, "Mood engine task started successfully with 4KB stack");
         }
     }
 
@@ -44,35 +43,38 @@ public:
         }
     }
 
-    void OnTimerTick() {
-        if (display_ == nullptr) return;
+    void RunTaskLoop() {
+        while (true) {
+            vTaskDelay(pdMS_TO_TICKS(10000)); // Har 10 second delay
+            if (display_ == nullptr) continue;
 
-        idle_seconds_ += 10;
+            idle_seconds_ += 10;
 
-        // Stage 1: 40 seconds idle -> thoda bored/neutral expression
-        if (idle_seconds_ >= 40 && idle_seconds_ < 90) {
-            display_->SetEmotion("Funny");
-        }
-        // Stage 2: 1.5 minutes (90s) tak koi baat nahi -> sad
-        else if (idle_seconds_ >= 90 && idle_seconds_ < 150) {
-            display_->SetEmotion("sad");
-        }
-        // Stage 3: 2.5 minutes (150s) se zyada bilkul shant -> sleepy
-        else if (idle_seconds_ >= 150) {
-            display_->SetEmotion("sleepy");
+            // Stage 1: 40 seconds idle -> funny / neutral
+            if (idle_seconds_ >= 40 && idle_seconds_ < 90) {
+                display_->SetEmotion("funny"); // Lowercase "funny"
+            }
+            // Stage 2: 90 seconds (1.5 min) idle -> sad
+            else if (idle_seconds_ >= 90 && idle_seconds_ < 150) {
+                display_->SetEmotion("sad");
+            }
+            // Stage 3: 150 seconds (2.5 min) idle -> sleepy
+            else if (idle_seconds_ >= 150) {
+                display_->SetEmotion("sleepy");
+            }
         }
     }
 
 private:
-    EmoMoodEngine() : display_(nullptr), timer_handle_(nullptr), idle_seconds_(0) {}
+    EmoMoodEngine() : display_(nullptr), task_handle_(nullptr), idle_seconds_(0) {}
     ~EmoMoodEngine() {
-        if (timer_handle_ != nullptr) {
-            xTimerStop(timer_handle_, 0);
-            xTimerDelete(timer_handle_, 0);
+        if (task_handle_ != nullptr) {
+            vTaskDelete(task_handle_);
+            task_handle_ = nullptr;
         }
     }
 
     Display* display_;
-    TimerHandle_t timer_handle_;
+    TaskHandle_t task_handle_;
     std::atomic<uint32_t> idle_seconds_;
 };
