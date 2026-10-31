@@ -117,11 +117,11 @@ void Application::Initialize() {
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
 
-   // --- Servo Neck Control MCP Tool ---
+    // --- Servo Neck Control MCP Tool ---
     mcp_server.AddTool(std::make_unique<McpTool>(
         "self.servo.turn",
         "Turn robot head to left, right, or center",
-        PropertyList({
+        PropertyList(std::vector<Property>{
             Property("direction", kPropertyTypeString, "Direction to turn: left, right, or center", true)
         }),
         [](const cJSON* params) -> std::string {
