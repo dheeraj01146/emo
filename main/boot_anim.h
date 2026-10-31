@@ -4,45 +4,81 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_log.h>
+#include <lvgl.h>
 
 #define BOOT_TAG "CinematicBoot"
 
 inline void RunEmoBootAnimation(Display* display) {
     if (display == nullptr) return;
 
-    ESP_LOGI(BOOT_TAG, "Running cinematic glow startup...");
+    ESP_LOGI(BOOT_TAG, "Running Cinematic Boot with expanding text animation...");
 
-    // Stage 1: Pitch Black Canvas
-    display->ClearChatMessages();
-    display->SetStatus("");
-    display->SetEmotion("neutral");
+    // 1. Black canvas load karo
+    lv_obj_t* boot_scr = lv_obj_create(NULL);
+    lv_obj_set_style_bg_color(boot_scr, lv_color_black(), 0);
+    lv_scr_load(boot_scr);
 
-    // Stage 2: Light Flare & Expanding Circle Effect (HarmonyOS Style)
-    display->SetChatMessage("assistant", "        .\n\n");
-    vTaskDelay(pdMS_TO_TICKS(180));
-    display->SetChatMessage("assistant", "       ( o )\n\n");
-    vTaskDelay(pdMS_TO_TICKS(180));
-    display->SetChatMessage("assistant", "     ((  O  ))\n\n");
-    vTaskDelay(pdMS_TO_TICKS(220));
+    // 2. Center Expanding Ring (HarmonyOS glow style)
+    lv_obj_t* ring = lv_arc_create(boot_scr);
+    lv_obj_set_size(ring, 130, 130);
+    lv_obj_center(ring);
+    lv_arc_set_rotation(ring, 270);
+    lv_arc_set_bg_angles(ring, 0, 360);
+    lv_obj_remove_style(ring, NULL, LV_PART_KNOB);
+    lv_obj_clear_flag(ring, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_arc_width(ring, 4, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(ring, lv_color_hex(0x00E5FF), LV_PART_MAIN);
 
-    // Stage 3: Logo Reveal with Glow Flare
-    display->SetChatMessage("assistant", "━ ━ ━ ━ ━ ━ ━ ━\n   E  M  O\n━ ━ ━ ━ ━ ━ ━ ━");
-    vTaskDelay(pdMS_TO_TICKS(600));
+    // 3. Center EMO Logo
+    lv_obj_t* logo_label = lv_label_create(boot_scr);
+    lv_label_set_text(logo_label, "E M O");
+    lv_obj_set_style_text_color(logo_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(logo_label, &lv_font_montserrat_28, 0);
+    lv_obj_align(logo_label, LV_ALIGN_CENTER, 0, -10);
 
-    // Stage 4: Steady Reveal - Powered by DHEERAJ
-    display->SetChatMessage("assistant", "   ◆  E M O  ◆\n\n  A I   R O B O T\n\npowered by DHEERAJ");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    // 4. Neeche ka Dynamic Expanding Text Label
+    lv_obj_t* sub_label = lv_label_create(boot_scr);
+    lv_obj_set_style_text_color(sub_label, lv_color_hex(0x80D8FF), 0);
+    lv_obj_align(sub_label, LV_ALIGN_BOTTOM_MID, 0, -25);
 
-    // Stage 5: Cinematic Iris Wipe (Eyes Unfold)
-    display->SetChatMessage("assistant", "—           —");
-    vTaskDelay(pdMS_TO_TICKS(120));
-    display->SetChatMessage("assistant", "▬           ▬");
-    vTaskDelay(pdMS_TO_TICKS(120));
-    display->SetChatMessage("assistant", "●           ●");
-    vTaskDelay(pdMS_TO_TICKS(180));
+    // Stage A: Ring ka smooth 360 degree sweep
+    for (int i = 0; i <= 360; i += 20) {
+        lv_arc_set_angles(ring, 0, i);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
 
-    // Stage 6: Final Ready State
-    display->ClearChatMessages();
-    display->SetStatus("EMO ONLINE");
-    display->SetEmotion("happy");
+    // Stage B: Pehle center me sirf "by" aayega
+    lv_label_set_text(sub_label, "by");
+    lv_obj_align(sub_label, LV_ALIGN_BOTTOM_MID, 0, -25);
+    vTaskDelay(pdMS_TO_TICKS(400));
+
+    // Stage C: "by" me se akshar expand hokar "powered by dheeraj" banenge
+    const char* text_frames[] = {
+        "d by d",
+        "ed by dh",
+        "red by dhee",
+        "ered by dheer",
+        "wered by dheera",
+        "owered by dheeraj",
+        "powered by dheeraj"
+    };
+
+    for (const char* frame : text_frames) {
+        lv_label_set_text(sub_label, frame);
+        lv_obj_align(sub_label, LV_ALIGN_BOTTOM_MID, 0, -25);
+        vTaskDelay(pdMS_TO_TICKS(90));
+    }
+
+    // Stage D: Logo aur final text ka bold glow hold
+    lv_obj_set_style_text_color(logo_label, lv_color_hex(0x00E5FF), 0);
+    lv_obj_set_style_text_color(sub_label, lv_color_white(), 0);
+    vTaskDelay(pdMS_TO_TICKS(1200));
+
+    // Stage E: Clean wipe aur EMO eyes load
+    lv_obj_del(boot_scr);
+
+    if (display != nullptr) {
+        display->SetStatus("EMO ONLINE");
+        display->SetEmotion("happy");
+    }
 }
