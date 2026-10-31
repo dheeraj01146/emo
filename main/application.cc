@@ -126,7 +126,7 @@ void Application::Initialize() {
 
         switch (event) {
             case NetworkEvent::Scanning:
-                display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
+               // display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
             case NetworkEvent::Connecting: {
@@ -481,7 +481,7 @@ void Application::CheckNewVersion() {
     auto& board = Board::GetInstance();
     while (true) {
         auto display = board.GetDisplay();
-        display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
+       // display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
 
         auto check = ota_->CheckVersion();
         if (!check) {
@@ -1049,12 +1049,12 @@ void Application::HandleStateChangedEvent() {
             audio_service_.EnableWakeWordDetection(true);
             break;
         case kDeviceStateConnecting:
-            display->SetStatus(Lang::Strings::CONNECTING);
+          //  display->SetStatus(Lang::Strings::CONNECTING);
             display->SetEmotion("neutral");
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
-            display->SetStatus(Lang::Strings::LISTENING);
+           // display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
             board.GetAudioCodec()->EnableInput(true);
           
