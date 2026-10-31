@@ -117,29 +117,31 @@ void Application::Initialize() {
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
 
-    // --- Servo Neck Control MCP Tool ---
+ // --- Servo Neck Control MCP Tool ---
     mcp_server.AddTool(std::make_unique<McpTool>(
         "self.servo.turn",
         "Turn robot head to left, right, or center",
-        PropertyList(std::vector<Property>{
-            Property("direction", kPropertyTypeString, "Direction to turn: left, right, or center", true)
-        }),
+        PropertyList(),
         [](const cJSON* params) -> std::string {
-            auto direction = cJSON_GetObjectItem(params, "direction");
-            if (cJSON_IsString(direction) && direction->valuestring != nullptr) {
-                std::string dir = direction->valuestring;
-                if (dir == "left") {
-                    ServoController::GetInstance().SetTarget(60.0f, 1.5f);
-                    return "{\"status\": \"success\", \"message\": \"Head turned left\"}";
-                } else if (dir == "right") {
-                    ServoController::GetInstance().SetTarget(120.0f, 1.5f);
-                    return "{\"status\": \"success\", \"message\": \"Head turned right\"}";
-                } else if (dir == "center") {
-                    ServoController::GetInstance().SetTarget(90.0f, 1.5f);
-                    return "{\"status\": \"success\", \"message\": \"Head centered\"}";
+            if (params != nullptr) {
+                auto direction = cJSON_GetObjectItem(params, "direction");
+                if (cJSON_IsString(direction) && direction->valuestring != nullptr) {
+                    std::string dir = direction->valuestring;
+                    if (dir == "left") {
+                        ServoController::GetInstance().SetTarget(60.0f, 1.5f);
+                        return "{\"status\": \"success\", \"message\": \"Head turned left\"}";
+                    } else if (dir == "right") {
+                        ServoController::GetInstance().SetTarget(120.0f, 1.5f);
+                        return "{\"status\": \"success\", \"message\": \"Head turned right\"}";
+                    } else if (dir == "center") {
+                        ServoController::GetInstance().SetTarget(90.0f, 1.5f);
+                        return "{\"status\": \"success\", \"message\": \"Head centered\"}";
+                    }
                 }
             }
-            return "{\"status\": \"failed\", \"error\": \"invalid direction, use left/right/center\"}";
+            // Agar bina param ke call ho toh default center kar de
+            ServoController::GetInstance().SetTarget(90.0f, 1.5f);
+            return "{\"status\": \"success\", \"message\": \"Head centered\"}";
         }
     ));
 
