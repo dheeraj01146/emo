@@ -112,14 +112,19 @@ void Application::Initialize() {
     // Start the clock timer to update the status bar
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
 
-  // Add MCP common tools (only once during initialization)
+   // Add MCP common tools (only once during initialization)
     auto& mcp_server = McpServer::GetInstance();
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
 
-    // --- Add Hardware Servo Neck Control Tool ---
-    mcp_server.AddTool("self.servo.turn", "Turn robot head to left, right, or center", 
-        [](const cJSON* params) -> std::string {
+    // --- Servo Neck Control MCP Tool ---
+    {
+        auto servo_tool = std::make_unique<McpTool>(
+            "self.servo.turn",
+            "Turn robot head to left, right, or center"
+        );  
+        servo_tool->AddProperty("direction", kPropertyTypeString, "Direction to turn: left, right, or center", true);
+        servo_tool->SetCallback([](const cJSON* params) -> std::string {
             auto direction = cJSON_GetObjectItem(params, "direction");
             if (cJSON_IsString(direction) && direction->valuestring != nullptr) {
                 std::string dir = direction->valuestring;
@@ -136,6 +141,10 @@ void Application::Initialize() {
             }
             return "{\"status\": \"failed\", \"error\": \"invalid direction, use left/right/center\"}";
         });
+        mcp_server.AddTool(std::move(servo_tool));
+    }
+
+    mcp_server.LogToolInventory();
 
     mcp_server.LogToolInventory();
     // Registration is complete here, so this is the only place the whole inventory exists.
