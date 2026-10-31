@@ -117,40 +117,32 @@ void Application::Initialize() {
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
 
-    // --- Servo Neck Control MCP Tool ---
-    {
-        auto servo_tool = std::make_unique<McpTool>(
-            "self.servo.turn",
-            "Turn robot head to left, right, or center"
-        );  
-        servo_tool->AddProperty("direction", kPropertyTypeString, "Direction to turn: left, right, or center", true);
-        servo_tool->SetCallback([](const cJSON* params) -> std::string {
+   // --- Servo Neck Control MCP Tool ---
+    mcp_server.AddTool(std::make_unique<McpTool>(
+        "self.servo.turn",
+        "Turn robot head to left, right, or center",
+        PropertyList({
+            Property("direction", kPropertyTypeString, "Direction to turn: left, right, or center", true)
+        }),
+        [](const cJSON* params) -> std::string {
             auto direction = cJSON_GetObjectItem(params, "direction");
             if (cJSON_IsString(direction) && direction->valuestring != nullptr) {
                 std::string dir = direction->valuestring;
                 if (dir == "left") {
-                    ServoController::GetInstance().SetAngle(45);
+                    ServoController::GetInstance().SetTarget(60.0f, 1.5f);
                     return "{\"status\": \"success\", \"message\": \"Head turned left\"}";
                 } else if (dir == "right") {
-                    ServoController::GetInstance().SetAngle(135);
+                    ServoController::GetInstance().SetTarget(120.0f, 1.5f);
                     return "{\"status\": \"success\", \"message\": \"Head turned right\"}";
                 } else if (dir == "center") {
-                    ServoController::GetInstance().SetAngle(90);
+                    ServoController::GetInstance().SetTarget(90.0f, 1.5f);
                     return "{\"status\": \"success\", \"message\": \"Head centered\"}";
                 }
             }
             return "{\"status\": \"failed\", \"error\": \"invalid direction, use left/right/center\"}";
-        });
-        mcp_server.AddTool(std::move(servo_tool));
-    }
+        }
+    ));
 
-    mcp_server.LogToolInventory();
-
-    mcp_server.LogToolInventory();
-    // Registration is complete here, so this is the only place the whole inventory exists.
-    // It is logged because a server that accepts a bounded number of tools drops the rest
-    // quietly: the only sign on this device was an alert at boot and a sad face, which is
-    // easy to see and hard to connect to a tool list.
     mcp_server.LogToolInventory();
 
     // Set network event callback for UI updates and network state handling
