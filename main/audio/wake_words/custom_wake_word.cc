@@ -120,7 +120,7 @@ bool CustomWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list) 
     multinet_model_data_ = multinet_->create(mn_name_, duration_);
 
     // --- FIX: Threshold ko 0.20 se badha kar 0.65 par set kiya ---
-    threshold_ = 0.20f; 
+    threshold_ = 0.50f; 
     multinet_->set_det_threshold(multinet_model_data_, threshold_);
 
     input_buffer_.reserve(multinet_->get_samp_chunksize(multinet_model_data_));
