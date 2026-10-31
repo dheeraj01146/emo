@@ -112,10 +112,32 @@ void Application::Initialize() {
     // Start the clock timer to update the status bar
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
 
-    // Add MCP common tools (only once during initialization)
+  // Add MCP common tools (only once during initialization)
     auto& mcp_server = McpServer::GetInstance();
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
+
+    // --- Add Hardware Servo Neck Control Tool ---
+    mcp_server.AddTool("self.servo.turn", "Turn robot head to left, right, or center", 
+        [](const cJSON* params) -> std::string {
+            auto direction = cJSON_GetObjectItem(params, "direction");
+            if (cJSON_IsString(direction) && direction->valuestring != nullptr) {
+                std::string dir = direction->valuestring;
+                if (dir == "left") {
+                    ServoController::GetInstance().SetAngle(45);
+                    return "{\"status\": \"success\", \"message\": \"Head turned left\"}";
+                } else if (dir == "right") {
+                    ServoController::GetInstance().SetAngle(135);
+                    return "{\"status\": \"success\", \"message\": \"Head turned right\"}";
+                } else if (dir == "center") {
+                    ServoController::GetInstance().SetAngle(90);
+                    return "{\"status\": \"success\", \"message\": \"Head centered\"}";
+                }
+            }
+            return "{\"status\": \"failed\", \"error\": \"invalid direction, use left/right/center\"}";
+        });
+
+    mcp_server.LogToolInventory();
     // Registration is complete here, so this is the only place the whole inventory exists.
     // It is logged because a server that accepts a bounded number of tools drops the rest
     // quietly: the only sign on this device was an alert at boot and a sad face, which is
