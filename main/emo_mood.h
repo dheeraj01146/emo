@@ -1,8 +1,12 @@
 #pragma once
+
 #include "display.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 #include <esp_log.h>
+#include <atomic>
+
+#define MOOD_TAG "EmoMood"
 
 class EmoMoodEngine {
 public:
@@ -14,62 +18,61 @@ public:
     void Start(Display* display) {
         display_ = display;
         idle_seconds_ = 0;
-        hunger_level_ = 0;
 
-        // Har 10 second par background timer chalega
-        mood_timer_ = xTimerCreate("EmoMoodTimer", pdMS_TO_TICKS(10000), pdTRUE, this, [](TimerHandle_t xTimer) {
-            auto engine = static_cast<EmoMoodEngine*>(pvTimerGetTimerID(xTimer));
-            engine->OnTick();
-        });
-
-        if (mood_timer_ != nullptr) {
-            xTimerStart(mood_timer_, 0);
+        if (timer_handle_ == nullptr) {
+            timer_handle_ = xTimerCreate(
+                "EmoMoodTimer",
+                pdMS_TO_TICKS(10000), // Har 10 second me check karega
+                pdTRUE,
+                this,
+                [](TimerHandle_t xTimer) {
+                    auto* engine = static_cast<EmoMoodEngine*>(pvTimerGetTimerID(xTimer));
+                    engine->OnTimerTick();
+                }
+            );
+            if (timer_handle_ != nullptr) {
+                xTimerStart(timer_handle_, 0);
+                ESP_LOGI(MOOD_TAG, "Mood engine started successfully");
+            }
         }
     }
 
-    // Jab bhi robot se baat ho ya tap ho, timer reset hoga
-    void ResetInteraction(const char* emotion = "happy") {
+    void ResetInteraction(const char* wake_emotion = "happy") {
         idle_seconds_ = 0;
-        hunger_level_ = 0;
-        if (display_) {
-            display_->SetEmotion(emotion);
+        if (display_ != nullptr && wake_emotion != nullptr) {
+            display_->SetEmotion(wake_emotion);
         }
     }
 
-    // Feeding voice command ya pet ke liye
-    void Feed() {
-        idle_seconds_ = 0;
-        hunger_level_ = 0;
-        if (display_) {
-            display_->SetEmotion("love");
-        }
-    }
-
-private:
-    EmoMoodEngine() : display_(nullptr), mood_timer_(nullptr), idle_seconds_(0), hunger_level_(0) {}
-
-    void OnTick() {
-        if (!display_) return;
+    void OnTimerTick() {
+        if (display_ == nullptr) return;
 
         idle_seconds_ += 10;
-        hunger_level_ += 1;
 
-        // 1. Agar 40 second tak koi na bole -> Bored / Doubt expression
-        if (idle_seconds_ == 40) {
-            display_->SetEmotion("engry");
+        // Stage 1: 40 seconds idle -> thoda bored/neutral expression
+        if (idle_seconds_ >= 40 && idle_seconds_ < 90) {
+            display_->SetEmotion("neutral");
         }
-        // 2. Agar 1.5 min tak koi dhyan na de -> Bhookh / Sad face
-        else if (hunger_level_ >= 10 && hunger_level_ < 16) {
+        // Stage 2: 1.5 minutes (90s) tak koi baat nahi -> sad
+        else if (idle_seconds_ >= 90 && idle_seconds_ < 150) {
             display_->SetEmotion("sad");
         }
-        // 3. Agar 2 minute se zyada chup chap pada rahe -> Sleepy mode
-        else if (idle_seconds_ >= 120) {
+        // Stage 3: 2.5 minutes (150s) se zyada bilkul shant -> sleepy
+        else if (idle_seconds_ >= 150) {
             display_->SetEmotion("sleepy");
         }
     }
 
+private:
+    EmoMoodEngine() : display_(nullptr), timer_handle_(nullptr), idle_seconds_(0) {}
+    ~EmoMoodEngine() {
+        if (timer_handle_ != nullptr) {
+            xTimerStop(timer_handle_, 0);
+            xTimerDelete(timer_handle_, 0);
+        }
+    }
+
     Display* display_;
-    TimerHandle_t mood_timer_;
-    int idle_seconds_;
-    int hunger_level_;
+    TimerHandle_t timer_handle_;
+    std::atomic<uint32_t> idle_seconds_;
 };
