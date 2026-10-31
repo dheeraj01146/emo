@@ -1057,7 +1057,7 @@ void Application::HandleStateChangedEvent() {
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
-           // display->SetStatus(Lang::Strings::LISTENING);
+            display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
             board.GetAudioCodec()->EnableInput(true);
           
