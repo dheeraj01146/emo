@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EMO // CYBER DECK OS</title>
-    <!-- Paho MQTT Library for Cloud Over-the-Air Control -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         :root {
             --bg-color: #050811;
@@ -221,6 +219,7 @@
             border: 1px solid rgba(255, 0, 85, 0.4);
             border-radius: 8px;
             padding: 14px;
+            position: relative;
         }
 
         .media-deck::before {
@@ -284,7 +283,7 @@
             <h1>EMO // CORE</h1>
             <div style="font-size: 0.65rem; color: var(--text-dim); letter-spacing: 1px;">CYBER COMMAND INTERFACE V2.0</div>
         </div>
-        <div class="status-badge" id="net-status">CONNECTING...</div>
+        <div class="status-badge" id="net-status">LOCAL ONLINE</div>
     </div>
 
     <!-- EMO Visual Eyes HUD -->
@@ -300,7 +299,7 @@
     <!-- Hardware Relays -->
     <div class="section-title">
         <span>// AUTOMATION RELAYS</span>
-        <span>NODE: 192.168.31.111</span>
+        <span id="node-ip">NODE: 192.168.31.111</span>
     </div>
 
     <div class="grid-2">
@@ -316,153 +315,4 @@
         </div>
 
         <div class="card">
-            <div class="card-top">
-                <span class="card-icon">💡</span>
-                <label class="switch">
-                    <input type="checkbox" onchange="sendRelay(2, this.checked)">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="card-title">LIGHT 2</div>
-        </div>
-
-        <div class="card">
-            <div class="card-top">
-                <span class="card-icon">🌀</span>
-                <label class="switch">
-                    <input type="checkbox" onchange="sendRelay(3, this.checked)">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="card-title">FAN RELAY</div>
-        </div>
-
-        <div class="card">
-            <div class="card-top">
-                <span class="card-icon">📺</span>
-                <label class="switch">
-                    <input type="checkbox" onchange="sendRelay(4, this.checked)">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="card-title">TV POWER</div>
-        </div>
-    </div>
-
-    <!-- Phone Media Deck -->
-    <div class="section-title">
-        <span>// BLUETOOTH MEDIA DECK</span>
-        <span>HID REMOTE</span>
-    </div>
-
-    <div class="media-deck">
-        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--accent-magenta); margin-bottom: 8px;">
-            <span>PHONE LINKED: EMO MEDIA REMOTE</span>
-            <span id="ble-state">STANDBY</span>
-        </div>
-        <div class="media-buttons">
-            <button class="btn-cyber" onclick="triggerMedia('prev')">⏮ PREV</button>
-            <button class="btn-cyber" onclick="triggerMedia('play')">⏯ PLAY</button>
-            <button class="btn-cyber" onclick="triggerMedia('next')">⏭ NEXT</button>
-        </div>
-        <div class="media-buttons" style="margin-top: 8px;">
-            <button class="btn-cyber" style="border-color: #00f3ff; background: rgba(0,243,255,0.1); color: #00f3ff;" onclick="triggerMedia('voldown')">🔉 VOL -</button>
-            <button class="btn-cyber" style="border-color: #00f3ff; background: rgba(0,243,255,0.1); color: #00f3ff;" onclick="triggerMedia('volup')">🔊 VOL +</button>
-        </div>
-    </div>
-
-    <!-- System Telemetry Log -->
-    <div class="section-title">
-        <span>// TERMINAL DIAGNOSTICS</span>
-    </div>
-    <div class="diag-box" id="terminal-log">
-        > NODE TARGET: <span class="diag-highlight">http://192.168.31.111</span><br>
-        > ESP32-S3 CORE: <span class="diag-highlight">ACTIVE</span><br>
-        > INITIALIZING DUAL CONTROL BRIDGE (LOCAL + CLOUD)...
-    </div>
-
-    <script>
-        const espIp = "http://192.168.31.111";
-        let mqttConnected = false;
-
-        function logToTerminal(msg) {
-            const term = document.getElementById("terminal-log");
-            term.innerHTML += `<br>> ${msg}`;
-            term.scrollTop = term.scrollHeight;
-        }
-
-        // --- CLOUD MQTT CLIENT SETUP ---
-        const MQTT_BROKER = "broker.emqx.io";
-        const MQTT_PORT = 8084; // Secure WebSocket Port
-        const CLIENT_ID = "emo_web_" + Math.random().toString(16).substr(2, 8);
-
-        const mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), CLIENT_ID);
-
-        mqttClient.onConnectionLost = function (responseObject) {
-            mqttConnected = false;
-            document.getElementById("net-status").innerText = "LOCAL MODE";
-            logToTerminal("Cloud Bridge disconnected: " + responseObject.errorMessage);
-        };
-
-        mqttClient.connect({
-            useSSL: true,
-            timeout: 5,
-            onSuccess: function () {
-                mqttConnected = true;
-                document.getElementById("net-status").innerText = "CLOUD LINKED";
-                logToTerminal("Cloud Bridge: Connected via WSS [broker.emqx.io]");
-            },
-            onFailure: function (err) {
-                mqttConnected = false;
-                document.getElementById("net-status").innerText = "LOCAL ONLY";
-                logToTerminal("Cloud Bridge fallback: using local direct requests");
-            }
-        });
-
-        // --- RELAY DISPATCHER (DUAL: LOCAL + CLOUD) ---
-        function sendRelay(id, state) {
-            const val = state ? 1 : 0;
-            logToTerminal(`Trigger Relay ${id} -> ${state ? 'ON' : 'OFF'}`);
-
-            // 1. Local Fetch Dispatch
-            fetch(`${espIp}/relay?id=${id}&state=${val}`, { mode: 'no-cors' })
-                .then(() => logToTerminal(`Local CMD dispatched to ${espIp}`))
-                .catch(() => logToTerminal(`Local fetch bypassed`));
-
-            // 2. Cloud MQTT Dispatch
-            if (mqttConnected) {
-                const payload = JSON.stringify({
-                    type: "cloud_relay",
-                    id: id,
-                    state: val
-                });
-                const message = new Paho.MQTT.Message(payload);
-                message.destinationName = "emo/control/relay";
-                mqttClient.send(message);
-                logToTerminal(`Cloud packet delivered to topic: emo/control/relay`);
-            }
-        }
-
-        // --- BLE MEDIA DISPATCHER ---
-        function triggerMedia(cmd) {
-            logToTerminal(`BLE Media Key: [${cmd.toUpperCase()}]`);
-
-            // 1. Local Request
-            fetch(`${espIp}/media?cmd=${cmd}`, { mode: 'no-cors' })
-                .then(() => logToTerminal(`BLE Signal Delivered locally`))
-                .catch(() => logToTerminal(`Local BLE signal dispatched`));
-
-            // 2. Cloud MQTT Dispatch
-            if (mqttConnected) {
-                const payload = JSON.stringify({
-                    type: "cloud_media",
-                    command: cmd
-                });
-                const message = new Paho.MQTT.Message(payload);
-                message.destinationName = "emo/control/media";
-                mqttClient.send(message);
-            }
-        }
-    </script>
-</body>
-</html>
+            <div class="
