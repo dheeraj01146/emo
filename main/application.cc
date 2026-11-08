@@ -175,8 +175,7 @@ void Application::Initialize() {
             return "Light 2 switched";
         });
 
-    // 3. Fan
-    mcp_save_tool_fix:       
+    // 3. Fan   
     mcp_server.AddTool("control_fan", "Turn Fan on or off",
         PropertyList(),
         [](const PropertyList& properties) {
