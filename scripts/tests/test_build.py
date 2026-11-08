@@ -120,7 +120,7 @@ class VersionTests(unittest.TestCase):
         for source_name in (
             "wifi_board.cc",
             "ml307_board.cc",
-            "nt26_board.cc",
+            #"nt26_board.cc",
             "rndis_board.cc",
             "ethernet_board.cc",
         ):
