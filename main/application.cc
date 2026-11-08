@@ -159,48 +159,37 @@ void Application::Initialize() {
         }); 
 
   
-// 1. Light 1 Control (ON / OFF)
+// 1. Light 1
     mcp_server.AddTool("control_light1", "Turn Light 1 on or off",
-        PropertyList({
-            Property("state", kPropertyTypeNumber)
-        }),
+        PropertyList(),
         [](const PropertyList& properties) {
-            int state = properties["state"].value<int>();
-            SendRelayControl(DEVICE_LIGHT1, state);
-            return state ? "Light 1 turned ON" : "Light 1 turned OFF";
+            SendRelayControl(DEVICE_LIGHT1, 1);
+            return "Light 1 switched";
         });
 
-    // 2. Light 2 Control (ON / OFF)
+    // 2. Light 2
     mcp_server.AddTool("control_light2", "Turn Light 2 on or off",
-        PropertyList({
-            Property("state", kPropertyTypeNumber)
-        }),
+        PropertyList(),
         [](const PropertyList& properties) {
-            int state = properties["state"].value<int>();
-            SendRelayControl(DEVICE_LIGHT2, state);
-            return state ? "Light 2 turned ON" : "Light 2 turned OFF";
+            SendRelayControl(DEVICE_LIGHT2, 1);
+            return "Light 2 switched";
         });
 
-    // 3. Fan Control (ON / OFF)
+    // 3. Fan
+    mcp_save_tool_fix:       
     mcp_server.AddTool("control_fan", "Turn Fan on or off",
-        PropertyList({
-            Property("state", kPropertyTypeNumber)
-        }),
+        PropertyList(),
         [](const PropertyList& properties) {
-            int state = properties["state"].value<int>();
-            SendRelayControl(DEVICE_FAN, state);
-            return state ? "Fan turned ON" : "Fan turned OFF";
+            SendRelayControl(DEVICE_FAN, 1);
+            return "Fan switched";
         });
 
-    // 4. TV Control (ON / OFF)
+    // 4. TV
     mcp_server.AddTool("control_tv", "Turn TV on or off",
-        PropertyList({
-            Property("state", kPropertyTypeNumber)
-        }),
+        PropertyList(),
         [](const PropertyList& properties) {
-            int state = properties["state"].value<int>();
-            SendRelayControl(DEVICE_TV, state);
-            return state ? "TV turned ON" : "TV turned OFF";
+            SendRelayControl(DEVICE_TV, 1);
+            return "TV switched";
         });
   
     // 5. Phone Flashlight Control Tool
