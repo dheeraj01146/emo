@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EMO // CYBER DECK OS</title>
+    <title>EMO // CYBER DECK OS PRO</title>
+    <!-- Paho MQTT Library for 4G/5G Remote Control -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         :root {
-            --bg-color: #050811;
-            --panel-bg: rgba(11, 20, 38, 0.75);
-            --border-glow: #00f3ff;
+            --bg-color: #03050b;
+            --panel-bg: rgba(10, 18, 32, 0.85);
             --accent-cyan: #00f3ff;
             --accent-magenta: #ff0055;
             --accent-yellow: #fcee0a;
+            --accent-warm: #ffb700;
             --text-main: #d8f8ff;
             --text-dim: #4b6e8a;
         }
@@ -27,30 +29,39 @@
         body {
             background-color: var(--bg-color);
             background-image: 
-                radial-gradient(circle at 50% 0%, rgba(0, 243, 255, 0.15), transparent 60%),
-                linear-gradient(rgba(0, 243, 255, 0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 243, 255, 0.04) 1px, transparent 1px);
-            background-size: 100% 100%, 25px 25px, 25px 25px;
+                radial-gradient(circle at 50% 0%, rgba(0, 243, 255, 0.12), transparent 70%),
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
             color: var(--text-main);
             min-height: 100vh;
             padding: 16px;
             display: flex;
             flex-direction: column;
             gap: 16px;
+            transition: background 0.5s ease;
         }
 
-        /* Top Header */
+        /* Ambient Room Glow when lights are ON */
+        body.light-active {
+            background-image: 
+                radial-gradient(circle at 50% 20%, rgba(255, 183, 0, 0.25), transparent 60%),
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+        }
+
+        /* Header */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid var(--accent-cyan);
-            padding-bottom: 10px;
+            padding-bottom: 12px;
             text-shadow: 0 0 10px var(--accent-cyan);
         }
 
         .header h1 {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             letter-spacing: 3px;
             color: var(--accent-cyan);
         }
@@ -59,19 +70,13 @@
             background: rgba(0, 243, 255, 0.1);
             border: 1px solid var(--accent-cyan);
             color: var(--accent-cyan);
-            padding: 4px 10px;
-            font-size: 0.75rem;
+            padding: 5px 10px;
+            font-size: 0.7rem;
             border-radius: 4px;
-            box-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
-            animation: pulse 2s infinite ease-in-out;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 0.7; }
-            50% { opacity: 1; filter: drop-shadow(0 0 5px var(--accent-cyan)); }
-        }
-
-        /* EMO Eye Simulator */
+        /* EMO Eye HUD */
         .hud-eye-box {
             background: var(--panel-bg);
             border: 1px solid var(--accent-cyan);
@@ -80,12 +85,14 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            box-shadow: inset 0 0 15px rgba(0, 243, 255, 0.15);
+            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.1);
+            position: relative;
+            overflow: hidden;
         }
 
         .hud-label {
             align-self: flex-start;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             color: var(--accent-yellow);
             letter-spacing: 2px;
             margin-bottom: 12px;
@@ -93,13 +100,13 @@
 
         .eyes-container {
             display: flex;
-            gap: 24px;
-            margin-bottom: 10px;
+            gap: 28px;
+            margin-bottom: 8px;
         }
 
         .eye {
-            width: 48px;
-            height: 52px;
+            width: 44px;
+            height: 48px;
             background: var(--accent-cyan);
             border-radius: 10px;
             box-shadow: 0 0 20px var(--accent-cyan);
@@ -113,10 +120,10 @@
 
         /* Grid Cards */
         .section-title {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-dim);
             letter-spacing: 2px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             display: flex;
             justify-content: space-between;
         }
@@ -129,15 +136,22 @@
 
         .card {
             background: var(--panel-bg);
-            border: 1px solid rgba(0, 243, 255, 0.3);
-            border-radius: 8px;
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            border-radius: 10px;
             padding: 14px;
             position: relative;
-            backdrop-filter: blur(4px);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            gap: 12px;
+            gap: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .card.active-glow {
+            border-color: var(--accent-warm);
+            box-shadow: 0 0 20px rgba(255, 183, 0, 0.3), inset 0 0 10px rgba(255, 183, 0, 0.2);
+            background: rgba(25, 22, 10, 0.85);
         }
 
         .card::before {
@@ -147,6 +161,12 @@
             width: 8px; height: 8px;
             border-top: 2px solid var(--accent-cyan);
             border-left: 2px solid var(--accent-cyan);
+            transition: border-color 0.3s;
+        }
+
+        .card.active-glow::before {
+            border-top-color: var(--accent-warm);
+            border-left-color: var(--accent-warm);
         }
 
         .card-top {
@@ -156,11 +176,22 @@
         }
 
         .card-icon {
-            font-size: 1.4rem;
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        /* Rotating Fan Animation */
+        .fan-spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .card-title {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: bold;
             color: #fff;
             letter-spacing: 1px;
@@ -170,8 +201,8 @@
         .switch {
             position: relative;
             display: inline-block;
-            width: 44px;
-            height: 22px;
+            width: 48px;
+            height: 24px;
         }
 
         .switch input {
@@ -183,7 +214,7 @@
             position: absolute;
             cursor: pointer;
             top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #1a2a44;
+            background-color: #121e33;
             border: 1px solid rgba(0, 243, 255, 0.4);
             border-radius: 20px;
             transition: .3s;
@@ -192,8 +223,8 @@
         .slider:before {
             position: absolute;
             content: "";
-            height: 14px;
-            width: 14px;
+            height: 16px;
+            width: 16px;
             left: 3px;
             bottom: 3px;
             background-color: var(--text-dim);
@@ -202,33 +233,24 @@
         }
 
         input:checked + .slider {
-            background-color: rgba(0, 243, 255, 0.25);
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+            background-color: rgba(255, 183, 0, 0.25);
+            border-color: var(--accent-warm);
+            box-shadow: 0 0 12px rgba(255, 183, 0, 0.5);
         }
 
         input:checked + .slider:before {
-            transform: translateX(22px);
-            background-color: var(--accent-cyan);
-            box-shadow: 0 0 8px var(--accent-cyan);
+            transform: translateX(24px);
+            background-color: var(--accent-warm);
+            box-shadow: 0 0 8px var(--accent-warm);
         }
 
-        /* Bluetooth Media Section */
+        /* Media Deck */
         .media-deck {
             background: var(--panel-bg);
             border: 1px solid rgba(255, 0, 85, 0.4);
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 14px;
             position: relative;
-        }
-
-        .media-deck::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0;
-            width: 8px; height: 8px;
-            border-top: 2px solid var(--accent-magenta);
-            border-left: 2px solid var(--accent-magenta);
         }
 
         .media-buttons {
@@ -242,8 +264,8 @@
             background: rgba(255, 0, 85, 0.1);
             border: 1px solid var(--accent-magenta);
             color: #fff;
-            padding: 10px 14px;
-            font-size: 0.9rem;
+            padding: 10px 12px;
+            font-size: 0.8rem;
             border-radius: 6px;
             cursor: pointer;
             flex: 1;
@@ -253,20 +275,20 @@
 
         .btn-cyber:active {
             background: var(--accent-magenta);
-            box-shadow: 0 0 12px var(--accent-magenta);
-            transform: scale(0.96);
+            box-shadow: 0 0 15px var(--accent-magenta);
+            transform: scale(0.95);
         }
 
-        /* Diagnostic Box */
+        /* Terminal Logs */
         .diag-box {
-            background: #020409;
-            border: 1px solid rgba(0, 243, 255, 0.25);
+            background: #010307;
+            border: 1px solid rgba(0, 243, 255, 0.2);
             border-radius: 6px;
             padding: 10px;
-            font-size: 0.72rem;
+            font-size: 0.7rem;
             color: var(--text-dim);
             line-height: 1.4;
-            max-height: 160px;
+            max-height: 130px;
             overflow-y: auto;
         }
 
@@ -277,42 +299,193 @@
 </head>
 <body>
 
-    <!-- Header -->
     <div class="header">
         <div>
             <h1>EMO // CORE</h1>
-            <div style="font-size: 0.65rem; color: var(--text-dim); letter-spacing: 1px;">CYBER COMMAND INTERFACE V2.0</div>
+            <div style="font-size: 0.6rem; color: var(--text-dim);">CYBER DECK OS // PRO EDITION</div>
         </div>
-        <div class="status-badge" id="net-status">LOCAL ONLINE</div>
+        <div class="status-badge" id="net-status">CONNECTING...</div>
     </div>
 
-    <!-- EMO Visual Eyes HUD -->
     <div class="hud-eye-box">
         <div class="hud-label">// LIVE DYNAMIC EXPRESSION</div>
         <div class="eyes-container">
             <div class="eye"></div>
             <div class="eye"></div>
         </div>
-        <div style="font-size: 0.68rem; color: var(--text-dim);">STATE: ACTIVE AWARENESS</div>
+        <div style="font-size: 0.65rem; color: var(--text-dim);">STATUS: SECURE HYBRID LINK</div>
     </div>
 
-    <!-- Hardware Relays -->
     <div class="section-title">
         <span>// AUTOMATION RELAYS</span>
-        <span id="node-ip">NODE: 192.168.31.111</span>
+        <span>LOCAL + 4G/5G CLOUD</span>
     </div>
 
     <div class="grid-2">
-        <div class="card">
+        <div class="card" id="card-1">
             <div class="card-top">
-                <span class="card-icon">💡</span>
+                <span class="card-icon" id="icon-1">💡</span>
                 <label class="switch">
-                    <input type="checkbox" onchange="sendRelay(1, this.checked)">
+                    <input type="checkbox" id="switch-1" onchange="sendRelay(1, this.checked)">
                     <span class="slider"></span>
                 </label>
             </div>
             <div class="card-title">LIGHT 1</div>
         </div>
 
-        <div class="card">
-            <div class="
+        <div class="card" id="card-2">
+            <div class="card-top">
+                <span class="card-icon" id="icon-2">💡</span>
+                <label class="switch">
+                    <input type="checkbox" id="switch-2" onchange="sendRelay(2, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="card-title">LIGHT 2</div>
+        </div>
+
+        <div class="card" id="card-3">
+            <div class="card-top">
+                <span class="card-icon" id="icon-3">🌀</span>
+                <label class="switch">
+                    <input type="checkbox" id="switch-3" onchange="sendRelay(3, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="card-title">FAN RELAY</div>
+        </div>
+
+        <div class="card" id="card-4">
+            <div class="card-top">
+                <span class="card-icon" id="icon-4">📺</span>
+                <label class="switch">
+                    <input type="checkbox" id="switch-4" onchange="sendRelay(4, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="card-title">TV POWER</div>
+        </div>
+    </div>
+
+    <!-- Bluetooth Media Deck -->
+    <div class="section-title">
+        <span>// BLUETOOTH MEDIA DECK</span>
+    </div>
+    <div class="media-deck">
+        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--accent-magenta); margin-bottom: 6px;">
+            <span>REMOTE AUDIO LINK</span>
+            <span>ACTIVE</span>
+        </div>
+        <div class="media-buttons">
+            <button class="btn-cyber" onclick="triggerMedia('prev')">⏮ PREV</button>
+            <button class="btn-cyber" onclick="triggerMedia('play')">⏯ PLAY</button>
+            <button class="btn-cyber" onclick="triggerMedia('next')">⏭ NEXT</button>
+        </div>
+    </div>
+
+    <div class="section-title">
+        <span>// TERMINAL TELEMETRY</span>
+    </div>
+    <div class="diag-box" id="terminal-log">
+        > SYSTEM: <span class="diag-highlight">INITIALIZING SECURE PROTOCOLS...</span>
+    </div>
+
+    <script>
+        const espIp = "http://192.168.31.111";
+        let mqttConnected = false;
+
+        function logToTerminal(msg) {
+            const term = document.getElementById("terminal-log");
+            term.innerHTML += `<br>> ${msg}`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // MQTT Cloud Connection for 4G/5G Anywhere Access
+        const MQTT_BROKER = "broker.emqx.io";
+        const MQTT_PORT = 8084;
+        const CLIENT_ID = "emo_pro_" + Math.random().toString(16).substr(2, 6);
+        const mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), CLIENT_ID);
+
+        mqttClient.onConnectionLost = function (responseObject) {
+            mqttConnected = false;
+            document.getElementById("net-status").innerText = "LOCAL MODE";
+            logToTerminal("Cloud disconnected. Operating on Local Wi-Fi.");
+        };
+
+        mqttClient.connect({
+            useSSL: true,
+            timeout: 4,
+            onSuccess: function () {
+                mqttConnected = true;
+                document.getElementById("net-status").innerText = "HYBRID ONLINE";
+                logToTerminal("Cloud MQTT Linked! 4G/5G Remote Access Ready.");
+            },
+            onFailure: function () {
+                mqttConnected = false;
+                document.getElementById("net-status").innerText = "LOCAL ONLY";
+                logToTerminal("Cloud unavailable. Local IP fallback active.");
+            }
+        });
+
+        function sendRelay(id, state) {
+            const val = state ? 1 : 0;
+            logToTerminal(`Relay ${id} -> ${val ? 'ON (Warm Glow)' : 'OFF'}`);
+
+            // Visual Animations & Glowing Effects
+            const card = document.getElementById(`card-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+
+            if (state) {
+                card.classList.add('active-glow');
+                if (id === 3) {
+                    icon.classList.add('fan-spinning'); // Fan rotation animation
+                }
+            } else {
+                card.classList.remove('active-glow');
+                if (id === 3) {
+                    icon.classList.remove('fan-spinning');
+                }
+            }
+
+            // Check if any light is active to warm up background glow
+            updateBackgroundAmbiance();
+
+            // 1. Local Network Request
+            fetch(`${espIp}/relay?id=${id}&state=${val}`, { mode: 'no-cors' }).catch(() => {});
+
+            // 2. Cloud MQTT Request (Works anywhere on 4G/5G)
+            if (mqttConnected) {
+                const payload = JSON.stringify({ type: "cloud_relay", id: id, state: val });
+                const message = new Paho.MQTT.Message(payload);
+                message.destinationName = "emo/control/relay";
+                mqttClient.send(message);
+                logToTerminal(`Cloud relay command sent for ID ${id}`);
+            }
+        }
+
+        function updateBackgroundAmbiance() {
+            const l1 = document.getElementById('switch-1').checked;
+            const l2 = document.getElementById('switch-2').checked;
+            if (l1 || l2) {
+                document.body.classList.add('light-active');
+            } else {
+                document.body.classList.remove('light-active');
+            }
+        }
+
+        function triggerMedia(cmd) {
+            logToTerminal(`Media Command: [${cmd.toUpperCase()}]`);
+            fetch(`${espIp}/media?cmd=${cmd}`, { mode: 'no-cors' }).catch(() => {});
+            
+            if (mqttConnected) {
+                const payload = JSON.stringify({ type: "cloud_media", command: cmd });
+                const message = new Paho.MQTT.Message(payload);
+                message.destinationName = "emo/control/media";
+                mqttClient.send(message);
+            }
+        }
+
+        logToTerminal("Cyber Deck Pro Interface Online.");
+    </script>
+</body>
+</html>
