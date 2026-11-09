@@ -161,34 +161,46 @@ void Application::Initialize() {
   
 // 1. Light 1
     mcp_server.AddTool("control_light1", "Turn Light 1 on or off",
-        PropertyList(),
+        PropertyList({
+            Property("state", "true for on, false for off", PropertyType::kBoolean)
+        }),
         [](const PropertyList& properties) {
-            SendRelayControl(DEVICE_LIGHT1, 1);
-            return "Light 1 switched";
+            bool state = properties["state"].value<bool>();
+            SendRelayControl(DEVICE_LIGHT1, state ? 1 : 0);
+            return state ? "Light 1 turned on" : "Light 1 turned off";
         });
 
     // 2. Light 2
     mcp_server.AddTool("control_light2", "Turn Light 2 on or off",
-        PropertyList(),
+        PropertyList({
+            Property("state", "true for on, false for off", PropertyType::kBoolean)
+        }),
         [](const PropertyList& properties) {
-            SendRelayControl(DEVICE_LIGHT2, 1);
-            return "Light 2 switched";
+            bool state = properties["state"].value<bool>();
+            SendRelayControl(DEVICE_LIGHT2, state ? 1 : 0);
+            return state ? "Light 2 turned on" : "Light 2 turned off";
         });
 
     // 3. Fan   
     mcp_server.AddTool("control_fan", "Turn Fan on or off",
-        PropertyList(),
+        PropertyList({
+            Property("state", "true for on, false for off", PropertyType::kBoolean)
+        }),
         [](const PropertyList& properties) {
-            SendRelayControl(DEVICE_FAN, 1);
-            return "Fan switched";
+            bool state = properties["state"].value<bool>();
+            SendRelayControl(DEVICE_FAN, state ? 1 : 0);
+            return state ? "Fan turned on" : "Fan turned off";
         });
 
     // 4. TV
     mcp_server.AddTool("control_tv", "Turn TV on or off",
-        PropertyList(),
+        PropertyList({
+            Property("state", "true for on, false for off", PropertyType::kBoolean)
+        }),
         [](const PropertyList& properties) {
-            SendRelayControl(DEVICE_TV, 1);
-            return "TV switched";
+            bool state = properties["state"].value<bool>();
+            SendRelayControl(DEVICE_TV, state ? 1 : 0);
+            return state ? "TV turned on" : "TV turned off";
         });
   
     // 5. Phone Flashlight Control Tool
