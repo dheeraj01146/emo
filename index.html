@@ -74,6 +74,19 @@
             font-size: 0.7rem;
             border-radius: 4px;
             box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+            font-weight: bold;
+        }
+
+        .status-badge.online {
+            border-color: #00ff88;
+            color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        .status-badge.offline {
+            border-color: var(--accent-magenta);
+            color: var(--accent-magenta);
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
         }
 
         /* EMO Eye HUD */
@@ -302,7 +315,7 @@
     <div class="header">
         <div>
             <h1>EMO // CORE</h1>
-            <div style="font-size: 0.6rem; color: var(--text-dim);">CYBER DECK OS // PRO EDITION</div>
+            <div style="font-size: 0.6rem; color: var(--text-dim);">CYBER DECK OS // PRO CLOUD</div>
         </div>
         <div class="status-badge" id="net-status">CONNECTING...</div>
     </div>
@@ -313,12 +326,12 @@
             <div class="eye"></div>
             <div class="eye"></div>
         </div>
-        <div style="font-size: 0.65rem; color: var(--text-dim);">STATUS: SECURE HYBRID LINK</div>
+        <div style="font-size: 0.65rem; color: var(--text-dim);">STATUS: SECURE 4G/5G CLOUD LINK</div>
     </div>
 
     <div class="section-title">
         <span>// AUTOMATION RELAYS</span>
-        <span>LOCAL + 4G/5G CLOUD</span>
+        <span>MQTT SECURE CHANNEL</span>
     </div>
 
     <div class="grid-2">
@@ -391,8 +404,15 @@
     </div>
 
     <script>
-        const espIp = "http://192.168.31.111";
+        // Unique topics taaki public broker par packets clash na hon
+        const MQTT_BROKER = "broker.emqx.io";
+        const MQTT_PORT = 8084;
+        const TOPIC_RELAY = "dheeraj_emo_hub_9921/control/relay";
+        const TOPIC_MEDIA = "dheeraj_emo_hub_9921/control/media";
+        const CLIENT_ID = "emo_web_" + Math.random().toString(16).substr(2, 8);
+
         let mqttConnected = false;
+        const mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), CLIENT_ID);
 
         function logToTerminal(msg) {
             const term = document.getElementById("terminal-log");
@@ -400,66 +420,66 @@
             term.scrollTop = term.scrollHeight;
         }
 
-        // MQTT Cloud Connection for 4G/5G Anywhere Access
-        const MQTT_BROKER = "broker.emqx.io";
-        const MQTT_PORT = 8084;
-        const CLIENT_ID = "emo_pro_" + Math.random().toString(16).substr(2, 6);
-        const mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), CLIENT_ID);
+        function setStatus(text, statusClass) {
+            const badge = document.getElementById("net-status");
+            badge.innerText = text;
+            badge.className = "status-badge " + statusClass;
+        }
 
         mqttClient.onConnectionLost = function (responseObject) {
             mqttConnected = false;
-            document.getElementById("net-status").innerText = "LOCAL MODE";
-            logToTerminal("Cloud disconnected. Operating on Local Wi-Fi.");
+            setStatus("DISCONNECTED", "offline");
+            logToTerminal("MQTT Connection lost. Auto-reconnecting in 3s...");
+            setTimeout(connectMQTT, 3000);
         };
 
-        mqttClient.connect({
-            useSSL: true,
-            timeout: 4,
-            onSuccess: function () {
-                mqttConnected = true;
-                document.getElementById("net-status").innerText = "HYBRID ONLINE";
-                logToTerminal("Cloud MQTT Linked! 4G/5G Remote Access Ready.");
-            },
-            onFailure: function () {
-                mqttConnected = false;
-                document.getElementById("net-status").innerText = "LOCAL ONLY";
-                logToTerminal("Cloud unavailable. Local IP fallback active.");
-            }
-        });
+        function connectMQTT() {
+            setStatus("CONNECTING...", "");
+            mqttClient.connect({
+                useSSL: true,
+                timeout: 5,
+                keepAliveInterval: 30,
+                cleanSession: true,
+                onSuccess: function () {
+                    mqttConnected = true;
+                    setStatus("CLOUD ONLINE", "online");
+                    logToTerminal("MQTT Cloud Linked! Ready on 4G/5G/Wi-Fi.");
+                },
+                onFailure: function (err) {
+                    mqttConnected = false;
+                    setStatus("CONNECT ERROR", "offline");
+                    logToTerminal("Link Failed: " + (err.errorMessage || "Network timeout") + ". Retrying in 5s...");
+                    setTimeout(connectMQTT, 5000);
+                }
+            });
+        }
 
         function sendRelay(id, state) {
             const val = state ? 1 : 0;
-            logToTerminal(`Relay ${id} -> ${val ? 'ON (Warm Glow)' : 'OFF'}`);
+            logToTerminal(`Relay ${id} -> ${val ? 'ON' : 'OFF'}`);
 
-            // Visual Animations & Glowing Effects
             const card = document.getElementById(`card-${id}`);
             const icon = document.getElementById(`icon-${id}`);
 
             if (state) {
                 card.classList.add('active-glow');
-                if (id === 3) {
-                    icon.classList.add('fan-spinning'); // Fan rotation animation
-                }
+                if (id === 3) icon.classList.add('fan-spinning');
             } else {
                 card.classList.remove('active-glow');
-                if (id === 3) {
-                    icon.classList.remove('fan-spinning');
-                }
+                if (id === 3) icon.classList.remove('fan-spinning');
             }
 
-            // Check if any light is active to warm up background glow
             updateBackgroundAmbiance();
 
-            // 1. Local Network Request
-            fetch(`${espIp}/relay?id=${id}&state=${val}`, { mode: 'no-cors' }).catch(() => {});
-
-            // 2. Cloud MQTT Request (Works anywhere on 4G/5G)
             if (mqttConnected) {
-                const payload = JSON.stringify({ type: "cloud_relay", id: id, state: val });
+                const payload = JSON.stringify({ id: Number(id), state: Number(val) });
                 const message = new Paho.MQTT.Message(payload);
-                message.destinationName = "emo/control/relay";
+                message.destinationName = TOPIC_RELAY;
+                message.qos = 1;
                 mqttClient.send(message);
-                logToTerminal(`Cloud relay command sent for ID ${id}`);
+                logToTerminal(`Cloud packet dispatched -> [Dev: ${id} | State: ${val}]`);
+            } else {
+                logToTerminal("Warning: MQTT offline hai, packet send nahi ho paya!");
             }
         }
 
@@ -475,17 +495,21 @@
 
         function triggerMedia(cmd) {
             logToTerminal(`Media Command: [${cmd.toUpperCase()}]`);
-            fetch(`${espIp}/media?cmd=${cmd}`, { mode: 'no-cors' }).catch(() => {});
-            
             if (mqttConnected) {
-                const payload = JSON.stringify({ type: "cloud_media", command: cmd });
+                const payload = JSON.stringify({ command: cmd });
                 const message = new Paho.MQTT.Message(payload);
-                message.destinationName = "emo/control/media";
+                message.destinationName = TOPIC_MEDIA;
+                message.qos = 1;
                 mqttClient.send(message);
+                logToTerminal(`Media dispatched -> ${cmd}`);
+            } else {
+                logToTerminal("Warning: MQTT offline hai!");
             }
         }
 
-        logToTerminal("Cyber Deck Pro Interface Online.");
+        // Initialize connection on load
+        connectMQTT();
+        logToTerminal("Cyber Deck Pro Interface Booted.");
     </script>
 </body>
 </html>
