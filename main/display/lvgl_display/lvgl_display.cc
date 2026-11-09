@@ -362,3 +362,20 @@ bool LvglDisplay::SnapshotToJpeg(std::string& jpeg_data, int quality) {
     return false;
 #endif
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
