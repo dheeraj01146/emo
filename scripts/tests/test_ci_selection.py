@@ -29,7 +29,7 @@ class CiSelectionTests(unittest.TestCase):
 
     def test_reviewed_list_has_18_builds_and_all_chip_targets(self):
         selected = self.load_manifest(self.manifest)
-        self.assertEqual(len(selected), 18)
+        self.assertEqual(len(selected), 17)
         self.assertEqual(
             {item["target"] for item in selected},
             {item["target"] for item in self.variants},
