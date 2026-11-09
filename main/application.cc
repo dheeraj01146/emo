@@ -1331,7 +1331,7 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
     auto display = board.GetDisplay();
 
     std::string upgrade_url = url;
-    std::version_info = version.empty() ? "(Manual upgrade)" : version;
+    std::string version_info = version.empty() ? "(Manual upgrade)" : version;
 
     if (GetDeviceState() == kDeviceStateNotifying) {
         StopNotification();
