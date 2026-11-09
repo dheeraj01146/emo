@@ -15,6 +15,7 @@
 #include "boot_anim.h"
 #include "emo_mood.h"
 #include "emo_touch.h"
+#include "mqtt_client.h"
 #include "emo_espnow.h"
 
 #include <driver/gpio.h>
@@ -158,7 +159,52 @@ void Application::Initialize() {
             return "Solution displayed on screen";
         }); 
 
-  
+  static void WebMqttEventHandler(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data) {
+    auto event = (esp_mqtt_event_handle_t)event_data;
+    if (event_id == MQTT_EVENT_CONNECTED) {
+        ESP_LOGI("WebBridge", "Connected to Web MQTT Broker! Subscribing...");
+        esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/relay", 1);
+        esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/media", 1);
+    } else if (event_id == MQTT_EVENT_DATA) {
+        std::string topic(event->topic, event->topic_len);
+        std::string data(event->data, event->data_len);
+        ESP_LOGI("WebBridge", "Command from Web -> Topic: %s, Data: %s", topic.c_str(), data.c_str());
+
+        if (topic == "dheeraj_emo_hub_9921/control/relay") {
+            cJSON* root = cJSON_Parse(data.c_str());
+            if (root) {
+                cJSON* id_item = cJSON_GetObjectItem(root, "id");
+                cJSON* state_item = cJSON_GetObjectItem(root, "state");
+                if (cJSON_IsNumber(id_item) && cJSON_IsNumber(state_item)) {
+                    uint8_t dev_id = id_item->valueint;
+                    uint8_t dev_state = state_item->valueint;
+                    SendRelayControl(dev_id, dev_state);
+                    ESP_LOGI("WebBridge", "Relay %d switched to %d via Web", dev_id, dev_state);
+                }
+                cJSON_Delete(root);
+            }
+        }
+    }
+}
+
+static void StartWebMqttBridge() {
+    static bool started = false;
+    if (started) return;
+    started = true;
+
+    esp_mqtt_client_config_t mqtt_cfg = {};
+    mqtt_cfg.broker.address.uri = "mqtt://broker.emqx.io:1883";
+    mqtt_cfg.credentials.client_id = "emo_bridge_hw_9921";
+
+    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    if (client) {
+        esp_mqtt_client_register_event(client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, WebMqttEventHandler, NULL);
+        esp_mqtt_client_start(client);
+        ESP_LOGI("WebBridge", "Web MQTT Bridge started successfully!");
+    }
+}
+
+    
 // 1. Light 1
     mcp_server.AddTool("control_light1", "Turn Light 1 on or off",
         PropertyList({
@@ -404,7 +450,8 @@ void Application::HandleNetworkConnectedEvent() {
 
     auto state = GetDeviceState();
     InitEmoRelaySender();
-   
+   StartWebMqttBridge();
+  
     if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring) {
         SetDeviceState(kDeviceStateActivating);
         if (activation_task_handle_ != nullptr) {
