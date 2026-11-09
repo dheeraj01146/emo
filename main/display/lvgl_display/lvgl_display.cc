@@ -223,7 +223,7 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
             if (update_all || cur_min != last_displayed_clock_min_) {
                 last_displayed_clock_min_ = cur_min;
                 char time_str[16];
-                strftime(time_str, sizeof(time_str), "%H:%M", tm_now);
+                strftime(time_str, sizeof(time_str), "%I:%M %p", tm_now);
                 SetStatus(time_str);
             }
         } else {
