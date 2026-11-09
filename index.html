@@ -404,11 +404,11 @@
     </div>
 
     <script>
-        // Unique topics taaki public broker par packets clash na hon
         const MQTT_BROKER = "broker.emqx.io";
         const MQTT_PORT = 8084;
         const TOPIC_RELAY = "dheeraj_emo_hub_9921/control/relay";
         const TOPIC_MEDIA = "dheeraj_emo_hub_9921/control/media";
+        const TOPIC_STATUS_WILDCARD = "dheeraj_emo_hub_9921/status/#";
         const CLIENT_ID = "emo_web_" + Math.random().toString(16).substr(2, 8);
 
         let mqttConnected = false;
@@ -426,6 +426,39 @@
             badge.className = "status-badge " + statusClass;
         }
 
+        function updateVisualState(id, state) {
+            const card = document.getElementById(`card-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            if (!card || !icon) return;
+
+            if (state) {
+                card.classList.add('active-glow');
+                if (id === 3) icon.classList.add('fan-spinning');
+            } else {
+                card.classList.remove('active-glow');
+                if (id === 3) icon.classList.remove('fan-spinning');
+            }
+            updateBackgroundAmbiance();
+        }
+
+        // Live State Sync from EMO / Cloud Retained
+        mqttClient.onMessageArrived = function (message) {
+            try {
+                const data = JSON.parse(message.payloadString);
+                const id = Number(data.id);
+                const state = (Number(data.state) === 1);
+
+                const sw = document.getElementById(`switch-${id}`);
+                if (sw) {
+                    sw.checked = state;
+                }
+                updateVisualState(id, state);
+                logToTerminal(`State Synced -> Device ${id} is [${state ? 'ON' : 'OFF'}]`);
+            } catch (e) {
+                console.error("Payload parse error", e);
+            }
+        };
+
         mqttClient.onConnectionLost = function (responseObject) {
             mqttConnected = false;
             setStatus("DISCONNECTED", "offline");
@@ -439,11 +472,14 @@
                 useSSL: true,
                 timeout: 5,
                 keepAliveInterval: 30,
-                cleanSession: true,
+                cleanSession: false,
                 onSuccess: function () {
                     mqttConnected = true;
                     setStatus("CLOUD ONLINE", "online");
-                    logToTerminal("MQTT Cloud Linked! Ready on 4G/5G/Wi-Fi.");
+                    logToTerminal("MQTT Cloud Linked! Listening for live relay states...");
+                    
+                    // Subscribe to live and retained status from EMO
+                    mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 1 });
                 },
                 onFailure: function (err) {
                     mqttConnected = false;
@@ -456,20 +492,7 @@
 
         function sendRelay(id, state) {
             const val = state ? 1 : 0;
-            logToTerminal(`Relay ${id} -> ${val ? 'ON' : 'OFF'}`);
-
-            const card = document.getElementById(`card-${id}`);
-            const icon = document.getElementById(`icon-${id}`);
-
-            if (state) {
-                card.classList.add('active-glow');
-                if (id === 3) icon.classList.add('fan-spinning');
-            } else {
-                card.classList.remove('active-glow');
-                if (id === 3) icon.classList.remove('fan-spinning');
-            }
-
-            updateBackgroundAmbiance();
+            updateVisualState(id, state);
 
             if (mqttConnected) {
                 const payload = JSON.stringify({ id: Number(id), state: Number(val) });
@@ -477,9 +500,9 @@
                 message.destinationName = TOPIC_RELAY;
                 message.qos = 1;
                 mqttClient.send(message);
-                logToTerminal(`Cloud packet dispatched -> [Dev: ${id} | State: ${val}]`);
+                logToTerminal(`Dispatched -> [Dev: ${id} | State: ${val}]`);
             } else {
-                logToTerminal("Warning: MQTT offline hai, packet send nahi ho paya!");
+                logToTerminal("Warning: MQTT offline hai, packet send nahi hua!");
             }
         }
 
