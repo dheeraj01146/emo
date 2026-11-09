@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EMO // CYBER DECK OS PRO</title>
-    <!-- Paho MQTT Library for 4G/5G Remote Control -->
+    <!-- Paho MQTT Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         :root {
@@ -40,14 +40,102 @@
             flex-direction: column;
             gap: 16px;
             transition: background 0.5s ease;
+            position: relative;
         }
 
-        /* Ambient Room Glow when lights are ON */
+        /* Ambient Glow when lights are ON */
         body.light-active {
             background-image: 
                 radial-gradient(circle at 50% 20%, rgba(255, 183, 0, 0.25), transparent 60%),
                 linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+        }
+
+        /* Fullscreen Cyber Boot Overlay */
+        #boot-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #020408;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+
+        #boot-overlay.fade-out {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .boot-core-ring {
+            width: 90px;
+            height: 90px;
+            border: 2px dashed var(--accent-cyan);
+            border-top-color: var(--accent-magenta);
+            border-radius: 50%;
+            animation: ringSpin 2s linear infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.4);
+        }
+
+        .boot-core-inner {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 50%;
+            animation: corePulse 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes ringSpin {
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes corePulse {
+            0% { transform: scale(0.85); box-shadow: 0 0 5px var(--accent-cyan); }
+            100% { transform: scale(1.15); box-shadow: 0 0 20px var(--accent-cyan); }
+        }
+
+        .boot-title {
+            color: var(--accent-cyan);
+            font-size: 1.15rem;
+            letter-spacing: 3px;
+            text-align: center;
+            text-shadow: 0 0 12px var(--accent-cyan);
+            min-height: 30px;
+            padding: 0 15px;
+        }
+
+        .boot-progress-bar {
+            width: 220px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .boot-progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-warm));
+            box-shadow: 0 0 10px var(--accent-cyan);
+            transition: width 0.2s linear;
+        }
+
+        .boot-subtext {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 2px;
         }
 
         /* Header */
@@ -257,41 +345,6 @@
             box-shadow: 0 0 8px var(--accent-warm);
         }
 
-        /* Media Deck */
-        .media-deck {
-            background: var(--panel-bg);
-            border: 1px solid rgba(255, 0, 85, 0.4);
-            border-radius: 10px;
-            padding: 14px;
-            position: relative;
-        }
-
-        .media-buttons {
-            display: flex;
-            justify-content: space-around;
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .btn-cyber {
-            background: rgba(255, 0, 85, 0.1);
-            border: 1px solid var(--accent-magenta);
-            color: #fff;
-            padding: 10px 12px;
-            font-size: 0.8rem;
-            border-radius: 6px;
-            cursor: pointer;
-            flex: 1;
-            font-weight: bold;
-            transition: all 0.2s;
-        }
-
-        .btn-cyber:active {
-            background: var(--accent-magenta);
-            box-shadow: 0 0 15px var(--accent-magenta);
-            transform: scale(0.95);
-        }
-
         /* Terminal Logs */
         .diag-box {
             background: #010307;
@@ -301,7 +354,7 @@
             font-size: 0.7rem;
             color: var(--text-dim);
             line-height: 1.4;
-            max-height: 130px;
+            max-height: 140px;
             overflow-y: auto;
         }
 
@@ -312,6 +365,19 @@
 </head>
 <body>
 
+    <!-- Cyber Startup Animation Overlay -->
+    <div id="boot-overlay">
+        <div class="boot-core-ring">
+            <div class="boot-core-inner"></div>
+        </div>
+        <div class="boot-title" id="boot-text"></div>
+        <div class="boot-progress-bar">
+            <div class="boot-progress-fill" id="boot-fill"></div>
+        </div>
+        <div class="boot-subtext">// INITIALIZING EMO AI LINK</div>
+    </div>
+
+    <!-- Main Header -->
     <div class="header">
         <div>
             <h1>EMO // CORE</h1>
@@ -320,6 +386,7 @@
         <div class="status-badge" id="net-status">CONNECTING...</div>
     </div>
 
+    <!-- Live Eye HUD -->
     <div class="hud-eye-box">
         <div class="hud-label">// LIVE DYNAMIC EXPRESSION</div>
         <div class="eyes-container">
@@ -334,6 +401,7 @@
         <span>MQTT SECURE CHANNEL</span>
     </div>
 
+    <!-- 4 Relays Grid -->
     <div class="grid-2">
         <div class="card" id="card-1">
             <div class="card-top">
@@ -380,34 +448,44 @@
         </div>
     </div>
 
-    <!-- Bluetooth Media Deck -->
-    <div class="section-title">
-        <span>// BLUETOOTH MEDIA DECK</span>
-    </div>
-    <div class="media-deck">
-        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--accent-magenta); margin-bottom: 6px;">
-            <span>REMOTE AUDIO LINK</span>
-            <span>ACTIVE</span>
-        </div>
-        <div class="media-buttons">
-            <button class="btn-cyber" onclick="triggerMedia('prev')">⏮ PREV</button>
-            <button class="btn-cyber" onclick="triggerMedia('play')">⏯ PLAY</button>
-            <button class="btn-cyber" onclick="triggerMedia('next')">⏭ NEXT</button>
-        </div>
-    </div>
-
+    <!-- Terminal Telemetry -->
     <div class="section-title">
         <span>// TERMINAL TELEMETRY</span>
     </div>
     <div class="diag-box" id="terminal-log">
-        > SYSTEM: <span class="diag-highlight">INITIALIZING SECURE PROTOCOLS...</span>
+        > SYSTEM: <span class="diag-highlight">ONLINE AND READY...</span>
     </div>
 
     <script>
+        // --- STARTUP ANIMATION ENGINE ---
+        const welcomeMessage = "HEY, WELCOME TO EMO AUTOMATION";
+        const bootTextElement = document.getElementById("boot-text");
+        const bootFillElement = document.getElementById("boot-fill");
+        const bootOverlay = document.getElementById("boot-overlay");
+
+        let charIndex = 0;
+        function playBootSequence() {
+            const typingInterval = setInterval(() => {
+                bootTextElement.textContent += welcomeMessage.charAt(charIndex);
+                charIndex++;
+                const progress = Math.min((charIndex / welcomeMessage.length) * 100, 100);
+                bootFillElement.style.width = progress + "%";
+
+                if (charIndex >= welcomeMessage.length) {
+                    clearInterval(typingInterval);
+                    setTimeout(() => {
+                        bootOverlay.classList.add("fade-out");
+                    }, 900);
+                }
+            }, 45);
+        }
+
+        window.addEventListener("DOMContentLoaded", playBootSequence);
+
+        // --- MQTT ENGINE ---
         const MQTT_BROKER = "broker.emqx.io";
         const MQTT_PORT = 8084;
         const TOPIC_RELAY = "dheeraj_emo_hub_9921/control/relay";
-        const TOPIC_MEDIA = "dheeraj_emo_hub_9921/control/media";
         const TOPIC_STATUS_WILDCARD = "dheeraj_emo_hub_9921/status/#";
         const CLIENT_ID = "emo_web_" + Math.random().toString(16).substr(2, 8);
 
@@ -441,7 +519,7 @@
             updateBackgroundAmbiance();
         }
 
-        // Live State Sync from EMO / Cloud Retained
+        // Live Retained Sync from EMO Hub
         mqttClient.onMessageArrived = function (message) {
             try {
                 const data = JSON.parse(message.payloadString);
@@ -449,20 +527,19 @@
                 const state = (Number(data.state) === 1);
 
                 const sw = document.getElementById(`switch-${id}`);
-                if (sw) {
-                    sw.checked = state;
-                }
+                if (sw) sw.checked = state;
+
                 updateVisualState(id, state);
-                logToTerminal(`State Synced -> Device ${id} is [${state ? 'ON' : 'OFF'}]`);
+                logToTerminal(`Synced -> Device ${id} is [${state ? 'ON' : 'OFF'}]`);
             } catch (e) {
-                console.error("Payload parse error", e);
+                console.error("Payload error", e);
             }
         };
 
-        mqttClient.onConnectionLost = function (responseObject) {
+        mqttClient.onConnectionLost = function () {
             mqttConnected = false;
             setStatus("DISCONNECTED", "offline");
-            logToTerminal("MQTT Connection lost. Auto-reconnecting in 3s...");
+            logToTerminal("MQTT Connection lost. Auto-reconnecting...");
             setTimeout(connectMQTT, 3000);
         };
 
@@ -476,15 +553,12 @@
                 onSuccess: function () {
                     mqttConnected = true;
                     setStatus("CLOUD ONLINE", "online");
-                    logToTerminal("MQTT Cloud Linked! Listening for live relay states...");
-                    
-                    // Subscribe to live and retained status from EMO
+                    logToTerminal("MQTT Cloud Linked! Ready on 4G/5G/Wi-Fi.");
                     mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 1 });
                 },
                 onFailure: function (err) {
                     mqttConnected = false;
                     setStatus("CONNECT ERROR", "offline");
-                    logToTerminal("Link Failed: " + (err.errorMessage || "Network timeout") + ". Retrying in 5s...");
                     setTimeout(connectMQTT, 5000);
                 }
             });
@@ -502,7 +576,7 @@
                 mqttClient.send(message);
                 logToTerminal(`Dispatched -> [Dev: ${id} | State: ${val}]`);
             } else {
-                logToTerminal("Warning: MQTT offline hai, packet send nahi hua!");
+                logToTerminal("Warning: MQTT offline hai!");
             }
         }
 
@@ -516,23 +590,7 @@
             }
         }
 
-        function triggerMedia(cmd) {
-            logToTerminal(`Media Command: [${cmd.toUpperCase()}]`);
-            if (mqttConnected) {
-                const payload = JSON.stringify({ command: cmd });
-                const message = new Paho.MQTT.Message(payload);
-                message.destinationName = TOPIC_MEDIA;
-                message.qos = 1;
-                mqttClient.send(message);
-                logToTerminal(`Media dispatched -> ${cmd}`);
-            } else {
-                logToTerminal("Warning: MQTT offline hai!");
-            }
-        }
-
-        // Initialize connection on load
         connectMQTT();
-        logToTerminal("Cyber Deck Pro Interface Booted.");
     </script>
 </body>
 </html>
