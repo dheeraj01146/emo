@@ -30,13 +30,38 @@
 
 #define TAG "Application"
 
-// ================= WEB MQTT BRIDGE START =================
+// ================= WEB MQTT BRIDGE & LIVE STATE SYNC START =================
+static esp_mqtt_client_handle_t s_web_mqtt_client = nullptr;
+static uint8_t s_relay_states[5] = {0, 0, 0, 0, 0}; // Index 1: Light1, 2: Light2, 3: Fan, 4: TV
+
+void BroadcastRelayState(uint8_t dev_id, uint8_t state) {
+    if (dev_id < 1 || dev_id > 4) return;
+    s_relay_states[dev_id] = state;
+
+    if (s_web_mqtt_client) {
+        char payload[64];
+        snprintf(payload, sizeof(payload), "{\"id\":%d,\"state\":%d}", dev_id, state);
+        
+        char topic[64];
+        snprintf(topic, sizeof(topic), "dheeraj_emo_hub_9921/status/dev%d", dev_id);
+        
+        // qos=1, retain=1 (retain=1 saves state on broker for web refresh sync)
+        esp_mqtt_client_publish(s_web_mqtt_client, topic, payload, 0, 1, 1);
+        ESP_LOGI("WebBridge", "State Broadcasted Retained -> Dev %d : %d", dev_id, state);
+    }
+}
+
 static void WebMqttEventHandler(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data) {
     auto event = (esp_mqtt_event_handle_t)event_data;
     if (event_id == MQTT_EVENT_CONNECTED) {
-        ESP_LOGI("WebBridge", "Connected to Web MQTT Broker! Subscribing...");
+        ESP_LOGI("WebBridge", "Connected to Web MQTT Broker! Subscribing & Syncing...");
         esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/relay", 1);
         esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/media", 1);
+
+        // Sync initial state on cloud connection
+        for (uint8_t i = 1; i <= 4; i++) {
+            BroadcastRelayState(i, s_relay_states[i]);
+        }
     } else if (event_id == MQTT_EVENT_DATA) {
         std::string topic(event->topic, event->topic_len);
         std::string data(event->data, event->data_len);
@@ -50,8 +75,10 @@ static void WebMqttEventHandler(void* handler_args, esp_event_base_t base, int32
                 if (cJSON_IsNumber(id_item) && cJSON_IsNumber(state_item)) {
                     uint8_t dev_id = id_item->valueint;
                     uint8_t dev_state = state_item->valueint;
+
                     SendRelayControl(dev_id, dev_state);
-                    ESP_LOGI("WebBridge", "Relay %d switched to %d via Web", dev_id, dev_state);
+                    BroadcastRelayState(dev_id, dev_state);
+                    ESP_LOGI("WebBridge", "Web Action executed -> Relay %d switched to %d", dev_id, dev_state);
                 }
                 cJSON_Delete(root);
             }
@@ -66,16 +93,16 @@ static void StartWebMqttBridge() {
 
     esp_mqtt_client_config_t mqtt_cfg = {};
     mqtt_cfg.broker.address.uri = "mqtt://broker.emqx.io:1883";
-    mqtt_cfg.credentials.client_id = "emo_bridge_hw_9921";
+    mqtt_cfg.credentials.client_id = "dheeraj_emo_robot_master";
 
-    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    if (client) {
-        esp_mqtt_client_register_event(client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, WebMqttEventHandler, NULL);
-        esp_mqtt_client_start(client);
+    s_web_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+    if (s_web_mqtt_client) {
+        esp_mqtt_client_register_event(s_web_mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, WebMqttEventHandler, NULL);
+        esp_mqtt_client_start(s_web_mqtt_client);
         ESP_LOGI("WebBridge", "Web MQTT Bridge started successfully!");
     }
 }
-// ================= WEB MQTT BRIDGE END =================
+// ================= WEB MQTT BRIDGE & LIVE STATE SYNC END =================
 
 Application::Application() : notify_player_(audio_service_) {
     event_group_ = xEventGroupCreate();
@@ -214,6 +241,7 @@ void Application::Initialize() {
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_LIGHT1, state ? 1 : 0);
+            BroadcastRelayState(DEVICE_LIGHT1, state ? 1 : 0);
             return state ? "Light 1 turned on" : "Light 1 turned off";
         });
 
@@ -225,6 +253,7 @@ void Application::Initialize() {
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_LIGHT2, state ? 1 : 0);
+            BroadcastRelayState(DEVICE_LIGHT2, state ? 1 : 0);
             return state ? "Light 2 turned on" : "Light 2 turned off";
         });
 
@@ -236,6 +265,7 @@ void Application::Initialize() {
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_FAN, state ? 1 : 0);
+            BroadcastRelayState(DEVICE_FAN, state ? 1 : 0);
             return state ? "Fan turned on" : "Fan turned off";
         });
 
@@ -247,6 +277,7 @@ void Application::Initialize() {
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_TV, state ? 1 : 0);
+            BroadcastRelayState(DEVICE_TV, state ? 1 : 0);
             return state ? "TV turned on" : "TV turned off";
         });
   
