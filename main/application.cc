@@ -162,9 +162,9 @@ void Application::Initialize() {
 // 1. Light 1
     mcp_server.AddTool("control_light1", "Turn Light 1 on or off",
         PropertyList({
-            Property("state", "true for on, false for off", PropertyType::kBoolean)
+            Property("state", kPropertyTypeBoolean)
         }),
-        [](const PropertyList& properties) {
+        [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_LIGHT1, state ? 1 : 0);
             return state ? "Light 1 turned on" : "Light 1 turned off";
@@ -173,9 +173,9 @@ void Application::Initialize() {
     // 2. Light 2
     mcp_server.AddTool("control_light2", "Turn Light 2 on or off",
         PropertyList({
-            Property("state", "true for on, false for off", PropertyType::kBoolean)
+            Property("state", kPropertyTypeBoolean)
         }),
-        [](const PropertyList& properties) {
+        [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_LIGHT2, state ? 1 : 0);
             return state ? "Light 2 turned on" : "Light 2 turned off";
@@ -184,9 +184,9 @@ void Application::Initialize() {
     // 3. Fan   
     mcp_server.AddTool("control_fan", "Turn Fan on or off",
         PropertyList({
-            Property("state", "true for on, false for off", PropertyType::kBoolean)
+            Property("state", kPropertyTypeBoolean)
         }),
-        [](const PropertyList& properties) {
+        [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_FAN, state ? 1 : 0);
             return state ? "Fan turned on" : "Fan turned off";
@@ -195,9 +195,9 @@ void Application::Initialize() {
     // 4. TV
     mcp_server.AddTool("control_tv", "Turn TV on or off",
         PropertyList({
-            Property("state", "true for on, false for off", PropertyType::kBoolean)
+            Property("state", kPropertyTypeBoolean)
         }),
-        [](const PropertyList& properties) {
+        [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_TV, state ? 1 : 0);
             return state ? "TV turned on" : "TV turned off";
