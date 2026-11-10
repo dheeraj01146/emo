@@ -26,9 +26,6 @@ typedef struct {
 static const uint8_t RELAY_BOARD_MAC[6] = {0x68, 0x09, 0x47, 0x86, 0x26, 0xA0};
 
 inline void InitEmoRelaySender() {
-    // Wi-Fi radio ko permanent Channel 1 par set karo
-    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
-
     esp_err_t err = esp_now_init();
     if (err != ESP_OK && err != ESP_ERR_ESPNOW_EXIST) {
         ESP_LOGE(RELAY_TAG, "ESP-NOW init failed: %d", err);
@@ -37,17 +34,17 @@ inline void InitEmoRelaySender() {
 
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, RELAY_BOARD_MAC, 6);
-    peer.channel = 1; // Permanent Hardcoded Channel 1
+    peer.channel = 11; // Hardcoded Channel 11 (Matching Jio Home Router)
     peer.ifidx = WIFI_IF_STA;
     peer.encrypt = false;
 
-    // Pehle purana peer agar ho toh clean karo
+    // Pehle purana peer clean karo agar ho toh
     if (esp_now_is_peer_exist(RELAY_BOARD_MAC)) {
         esp_now_del_peer(RELAY_BOARD_MAC);
     }
 
     if (esp_now_add_peer(&peer) == ESP_OK) {
-        ESP_LOGI(RELAY_TAG, "Relay Board Paired on Channel 1: 68:09:47:86:26:A0");
+        ESP_LOGI(RELAY_TAG, "Relay Board Paired on Fixed Channel 11: 68:09:47:86:26:A0");
     } else {
         ESP_LOGE(RELAY_TAG, "Failed to add Relay Board peer");
     }
@@ -61,13 +58,12 @@ inline void SendRelayControl(uint8_t device_num, uint8_t state) {
     RelayCommand cmd = {device_num, state};
     esp_err_t result = esp_now_send(RELAY_BOARD_MAC, (const uint8_t*)&cmd, sizeof(RelayCommand));
     if (result == ESP_OK) {
-        ESP_LOGI(RELAY_TAG, "Command Sent -> Device: %d, State: %d (Ch 1)", device_num, state);
+        ESP_LOGI(RELAY_TAG, "Command Sent -> Device: %d, State: %d (Fixed Ch 11)", device_num, state);
     } else {
         ESP_LOGE(RELAY_TAG, "Failed to send command: %d", result);
     }
 }
 #else
-// Non-S3 builds pipeline pass hone ke liye safe stubs
 inline void InitEmoRelaySender() {}
 inline void SendRelayControl(uint8_t device_num, uint8_t state) {}
 #endif
