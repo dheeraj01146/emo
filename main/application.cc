@@ -468,6 +468,10 @@ void Application::Run() {
 void Application::HandleNetworkConnectedEvent() {
     ESP_LOGI(TAG, "Network connected");
 
+    // Wi-Fi aur ESP-NOW ko permanently Channel 1 par hardcode/lock kiya
+    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+    ESP_LOGI(TAG, "Wi-Fi & ESP-NOW channel hardcoded to: 1");
+
     esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (netif) {
         esp_netif_dns_info_t dns_info = {};
@@ -476,6 +480,7 @@ void Application::HandleNetworkConnectedEvent() {
         esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info);
 
         dns_info.ip.u_addr.ip4.addr = ipaddr_addr("1.1.1.1");
+        dns_info.ip.type = ESP_IPADDR_TYPE_V4;
         esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns_info);
         ESP_LOGI(TAG, "Custom DNS 8.8.8.8 and 1.1.1.1 applied successfully");
     }
@@ -483,6 +488,8 @@ void Application::HandleNetworkConnectedEvent() {
     auto state = GetDeviceState();
     InitEmoRelaySender();
     StartWebMqttBridge();
+    
+    // ... baaki function ka code waisa hi rahega
   
     if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring) {
         SetDeviceState(kDeviceStateActivating);
