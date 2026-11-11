@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EMO Cyber Hub & Display Commander</title>
+  <title>EMO IoT Cyber Relay Hub</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Paho MQTT Client via WebSocket -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
-  <!-- Google Fonts Inter & Orbitron -->
+  <!-- Google Fonts: Inter & Orbitron -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
   <script>
     tailwind.config = {
@@ -22,26 +22,27 @@
         extend: {
           colors: {
             cyber: {
-              black: '#07090e',
-              dark: '#0e131d',
-              card: '#131b29',
-              border: '#1f2d42',
+              black: '#05070b',
+              dark: '#0a0f18',
+              card: '#0f1726',
+              cardHover: '#142035',
+              border: '#1b2a42',
               cyan: '#00f5ff',
-              cyanDark: '#008b99',
+              cyanGlow: 'rgba(0, 245, 255, 0.45)',
+              emerald: '#00ff88',
               neonPink: '#ff2a85',
-              neonGreen: '#00ff88',
               neonYellow: '#ffd600'
             }
           },
           fontFamily: {
             orbitron: ['Orbitron', 'sans-serif'],
-            inter: ['Inter', 'sans-serif']
+            inter: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
           },
           boxShadow: {
-            glow: '0 0 20px rgba(0, 245, 255, 0.35)',
-            glowSm: '0 0 10px rgba(0, 245, 255, 0.45)',
-            pinkGlow: '0 0 15px rgba(255, 42, 133, 0.4)',
-            greenGlow: '0 0 15px rgba(0, 255, 136, 0.4)'
+            cyanGlow: '0 0 25px rgba(0, 245, 255, 0.35)',
+            emeraldGlow: '0 0 25px rgba(0, 255, 136, 0.35)',
+            cardActive: '0 0 20px rgba(0, 245, 255, 0.2), inset 0 0 15px rgba(0, 245, 255, 0.05)'
           }
         }
       }
@@ -50,35 +51,47 @@
 
   <style>
     body {
-      background-color: #07090e;
+      background-color: #05070b;
       background-image: 
-        radial-gradient(circle at 15% 15%, rgba(0, 245, 255, 0.05) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(255, 42, 133, 0.04) 0%, transparent 40%);
+        radial-gradient(circle at 10% 20%, rgba(0, 245, 255, 0.04) 0%, transparent 45%),
+        radial-gradient(circle at 90% 80%, rgba(0, 255, 136, 0.03) 0%, transparent 45%);
       font-family: 'Inter', sans-serif;
     }
-    .scanline {
-      position: relative;
-    }
-    .scanline::after {
-      content: " ";
-      display: block;
-      position: absolute;
-      top: 0; left: 0; bottom: 0; right: 0;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 245, 255, 0.04) 50%);
+
+    /* Ambient Scanline Texture */
+    .scanlines {
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 245, 255, 0.02) 50%);
       background-size: 100% 4px;
-      z-index: 20;
       pointer-events: none;
     }
-    /* Custom Scrollbar */
+
+    /* Animated Fan */
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-fan {
+      animation: spin-slow 0.45s linear infinite;
+    }
+
+    /* TV Flicker Screen Glow */
+    @keyframes tv-glow {
+      0%, 100% { opacity: 0.95; filter: drop-shadow(0 0 8px #00f5ff); }
+      50% { opacity: 0.75; filter: drop-shadow(0 0 3px #00a8b3); }
+    }
+    .tv-active {
+      animation: tv-glow 1.8s ease-in-out infinite;
+    }
+
+    /* Custom Terminal Scrollbar */
     ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+      width: 5px;
     }
     ::-webkit-scrollbar-track {
-      background: #0e131d;
+      background: #0a0f18;
     }
     ::-webkit-scrollbar-thumb {
-      background: #1f2d42;
+      background: #1b2a42;
       border-radius: 4px;
     }
     ::-webkit-scrollbar-thumb:hover {
@@ -87,472 +100,324 @@
   </style>
 </head>
 
-<body class="text-slate-200 min-h-screen flex flex-col antialiased selection:bg-cyber-cyan selection:text-black">
+<body class="text-slate-200 min-h-screen flex flex-col antialiased selection:bg-cyber-cyan selection:text-black relative overflow-x-hidden">
+  
+  <!-- Ambient Scanline Overlay -->
+  <div class="fixed inset-0 scanlines z-40"></div>
 
-  <!-- TOP NAVIGATION BAR -->
-  <header class="border-b border-cyber-border bg-cyber-dark/80 backdrop-blur-md sticky top-0 z-50 px-4 py-3 sm:px-8 flex flex-wrap justify-between items-center gap-3">
+  <!-- TOP CYBER HEADER -->
+  <header class="border-b border-cyber-border bg-cyber-dark/90 backdrop-blur-md sticky top-0 z-30 px-4 py-3 sm:px-8 flex flex-wrap justify-between items-center gap-4">
+    <!-- Brand Title -->
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-cyber-cyan p-0.5 shadow-glow flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-cyber-cyan to-emerald-400 p-0.5 shadow-cyanGlow flex items-center justify-center">
         <div class="w-full h-full bg-cyber-black rounded-[10px] flex items-center justify-center">
-          <i class="fa-solid fa-robot text-cyber-cyan text-lg"></i>
+          <i class="fa-solid fa-bolt text-cyber-cyan text-lg"></i>
         </div>
       </div>
       <div>
-        <h1 class="font-orbitron font-bold text-lg sm:text-xl tracking-wider text-white flex items-center gap-2">
-          EMO <span class="text-cyber-cyan text-xs sm:text-sm px-2 py-0.5 rounded-full border border-cyber-cyan/40 bg-cyber-cyan/10">STUDIO HUB</span>
+        <h1 class="font-orbitron font-extrabold text-lg sm:text-xl tracking-wider text-white flex items-center gap-2">
+          EMO <span class="text-cyber-cyan text-xs sm:text-sm px-2.5 py-0.5 rounded-full border border-cyber-cyan/40 bg-cyber-cyan/10">RELAY HUB</span>
         </h1>
-        <p class="text-[11px] text-slate-400 font-mono tracking-tight">ESP32-S3 Live Screen & Relay Controller</p>
+        <p class="text-[11px] text-slate-400 font-mono tracking-tight flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          ESP-NOW 4-CH WIRELESS APPLIANCE MATRIX
+        </p>
       </div>
     </div>
 
-    <!-- Connection Indicator & Quick Status -->
+    <!-- Status & Ping Badge -->
     <div class="flex items-center gap-3">
-      <div id="mqttStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-red-500/40 bg-red-500/10 text-red-400 font-mono text-xs shadow-sm transition-all duration-300">
-        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-        <span id="mqttStatusText">DISCONNECTED</span>
+      <div id="mqttBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400 font-mono text-xs shadow-sm transition-all duration-300">
+        <span id="mqttDot" class="w-2 h-2 rounded-full bg-rose-500"></span>
+        <span id="mqttStatusText" class="font-semibold tracking-wider">DISCONNECTED</span>
       </div>
-      <button onclick="toggleMqttModal()" class="p-2 text-slate-400 hover:text-cyber-cyan bg-cyber-card border border-cyber-border hover:border-cyber-cyan/40 rounded-xl transition">
-        <i class="fa-solid fa-gear"></i>
+
+      <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-cyber-border bg-cyber-card text-[11px] font-mono text-slate-400">
+        <i class="fa-solid fa-wifi text-cyber-cyan text-xs"></i>
+        <span id="pingDisplay">-- ms</span>
+      </div>
+
+      <button onclick="reconnectMqtt()" title="Force Reconnect" class="p-2 text-slate-400 hover:text-cyber-cyan bg-cyber-card border border-cyber-border hover:border-cyber-cyan/50 rounded-xl transition active:scale-95">
+        <i class="fa-solid fa-rotate text-sm"></i>
       </button>
     </div>
   </header>
 
-  <!-- MAIN WRAPPER -->
-  <main class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="flex-1 max-w-5xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex flex-col gap-6 z-10">
 
-    <!-- LEFT COLUMN: IMAGE VIEWER & CANVAS COMPOSER (7 Columns) -->
-    <section class="lg:col-span-7 flex flex-col gap-6">
-      
-      <!-- Screen Preview Board -->
-      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl relative overflow-hidden">
-        <div class="flex justify-between items-center mb-4">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-cyber-cyan shadow-glowSm"></span>
-            <h2 class="font-orbitron font-semibold text-sm tracking-wider text-white">EMO 320x320 VIRTUAL DISPLAY</h2>
-          </div>
-          <span class="text-xs font-mono text-cyber-cyan bg-cyber-cyan/10 px-2 py-0.5 rounded border border-cyber-cyan/20">TARGET: 320 x 320 px</span>
-        </div>
-
-        <!-- The Frame mimicking EMO's Display Bezel -->
-        <div class="flex flex-col items-center justify-center p-4 bg-cyber-black rounded-xl border border-cyber-border/80">
-          <div class="relative p-3 bg-gradient-to-b from-[#181f2c] to-[#0c1017] rounded-[2rem] border-2 border-[#2b394f] shadow-2xl">
-            <!-- Screen Notch / Sensor dot -->
-            <div class="w-2.5 h-2.5 bg-black rounded-full mx-auto mb-2 border border-white/10"></div>
-            
-            <!-- Canvas Simulation -->
-            <div class="relative w-[280px] h-[280px] sm:w-[320px] sm:h-[320px] rounded-2xl overflow-hidden bg-black shadow-inner border border-cyber-cyan/30 scanline flex items-center justify-center">
-              <canvas id="emoCanvas" width="320" height="320" class="w-full h-full object-contain block"></canvas>
-              
-              <!-- Placeholder text when empty -->
-              <div id="canvasPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-slate-500 bg-cyber-black/90 pointer-events-none transition-opacity duration-300">
-                <i class="fa-regular fa-image text-4xl text-cyber-cyan/50 mb-3 animate-pulse"></i>
-                <p class="text-xs font-mono text-slate-300">NO IMAGE LOADED</p>
-                <p class="text-[11px] text-slate-500 mt-1">Select a picture or drag & drop to transmit onto EMO's face</p>
-              </div>
-            </div>
-            
-            <!-- EMO Logo on bezel bottom -->
-            <div class="text-center mt-2">
-              <span class="font-orbitron text-[10px] tracking-widest text-slate-500 font-bold">E M O</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Image Enhancement Controls -->
-        <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-cyber-dark p-4 rounded-xl border border-cyber-border">
-          <div>
-            <div class="flex justify-between text-xs font-mono text-slate-400 mb-1">
-              <span>BRIGHTNESS</span>
-              <span id="valBrightness">100%</span>
-            </div>
-            <input type="range" id="sliderBrightness" min="30" max="200" value="100" class="w-full accent-cyber-cyan cursor-pointer">
-          </div>
-
-          <div>
-            <div class="flex justify-between text-xs font-mono text-slate-400 mb-1">
-              <span>CONTRAST</span>
-              <span id="valContrast">100%</span>
-            </div>
-            <input type="range" id="sliderContrast" min="50" max="250" value="100" class="w-full accent-cyber-cyan cursor-pointer">
-          </div>
-
-          <!-- Color Filters -->
-          <div class="sm:col-span-2 flex flex-wrap gap-2 pt-2 border-t border-cyber-border/60">
-            <button onclick="applyFilter('normal')" class="filter-btn active px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-cyan bg-cyber-cyan/20 text-cyber-cyan transition">Normal</button>
-            <button onclick="applyFilter('grayscale')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-border bg-cyber-card text-slate-300 hover:border-cyber-cyan transition">Grayscale</button>
-            <button onclick="applyFilter('cyber')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-border bg-cyber-card text-slate-300 hover:border-cyber-cyan transition">Cyber Tint</button>
-            <button onclick="applyFilter('invert')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-border bg-cyber-card text-slate-300 hover:border-cyber-cyan transition">Invert</button>
-            <button onclick="applyFilter('threshold')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-border bg-cyber-card text-slate-300 hover:border-cyber-cyan transition">High B&W</button>
-            <button onclick="resetFilters()" class="ml-auto px-3 py-1.5 text-xs text-rose-400 hover:text-rose-300 font-mono transition">
-              <i class="fa-solid fa-rotate-left mr-1"></i>Reset
-            </button>
-          </div>
-        </div>
-
-        <!-- UPLOAD & TRANSMIT BUTTONS -->
-        <div class="mt-5 flex flex-wrap gap-3">
-          <!-- Hidden input -->
-          <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
-          
-          <button onclick="document.getElementById('imageInput').click()" class="flex-1 py-3 px-4 rounded-xl bg-cyber-card hover:bg-cyber-dark border border-cyber-border hover:border-cyber-cyan text-white text-xs sm:text-sm font-semibold tracking-wide flex items-center justify-center gap-2 transition shadow-sm">
-            <i class="fa-solid fa-cloud-arrow-up text-cyber-cyan"></i>
-            UPLOAD IMAGE
-          </button>
-
-          <button onclick="openCameraModal()" class="py-3 px-4 rounded-xl bg-cyber-card hover:bg-cyber-dark border border-cyber-border hover:border-cyber-cyan text-white text-xs sm:text-sm font-semibold tracking-wide flex items-center justify-center gap-2 transition">
-            <i class="fa-solid fa-camera text-cyber-cyan"></i>
-            CAMERA
-          </button>
-
-          <button id="btnSendToEmo" onclick="sendImageToEmo()" class="w-full sm:w-auto flex-[1.5] py-3 px-6 rounded-xl bg-gradient-to-r from-cyan-500 to-cyber-cyan hover:from-cyan-400 hover:to-cyan-300 text-black font-orbitron font-bold text-xs sm:text-sm tracking-wider flex items-center justify-center gap-2 transition shadow-glow">
-            <i class="fa-solid fa-paper-plane text-black"></i>
-            SEND TO EMO DISPLAY
-          </button>
-        </div>
-
-        <div id="sendFeedback" class="mt-3 text-xs font-mono text-center hidden py-2 px-3 rounded-lg"></div>
-
+    <!-- SUMMARY TELEMETRY STRIP -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+      <div class="bg-cyber-card/80 border border-cyber-border rounded-xl p-3 flex flex-col gap-1">
+        <span class="text-slate-500 text-[10px]">TOTAL LOADS</span>
+        <span class="text-white text-base font-bold font-orbitron">4 APPLIANCES</span>
       </div>
-
-      <!-- Quick Preset Images / Meme Stickers -->
-      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl">
-        <h3 class="font-orbitron text-xs font-semibold tracking-wider text-slate-300 mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-icons text-cyber-cyan"></i>
-          QUICK CYBER PRESETS (Click to Preview & Send)
-        </h3>
-        <div class="grid grid-cols-4 sm:grid-cols-6 gap-3">
-          <button onclick="loadPresetImage('robot')" class="group p-2 rounded-xl bg-cyber-dark border border-cyber-border hover:border-cyber-cyan flex flex-col items-center gap-1 transition">
-            <div class="w-10 h-10 rounded-lg bg-cyber-black flex items-center justify-center text-cyber-cyan group-hover:scale-110 transition">
-              <i class="fa-solid fa-robot text-lg"></i>
-            </div>
-            <span class="text-[10px] font-mono text-slate-400">EMO Eye</span>
-          </button>
-
-          <button onclick="loadPresetImage('heart')" class="group p-2 rounded-xl bg-cyber-dark border border-cyber-border hover:border-cyber-pink flex flex-col items-center gap-1 transition">
-            <div class="w-10 h-10 rounded-lg bg-cyber-black flex items-center justify-center text-cyber-neonPink group-hover:scale-110 transition">
-              <i class="fa-solid fa-heart text-lg"></i>
-            </div>
-            <span class="text-[10px] font-mono text-slate-400">Love</span>
-          </button>
-
-          <button onclick="loadPresetImage('game')" class="group p-2 rounded-xl bg-cyber-dark border border-cyber-border hover:border-cyber-neonGreen flex flex-col items-center gap-1 transition">
-            <div class="w-10 h-10 rounded-lg bg-cyber-black flex items-center justify-center text-cyber-neonGreen group-hover:scale-110 transition">
-              <i class="fa-solid fa-gamepad text-lg"></i>
-            </div>
-            <span class="text-[10px] font-mono text-slate-400">Gaming</span>
-          </button>
-
-          <button onclick="loadPresetImage('matrix')" class="group p-2 rounded-xl bg-cyber-dark border border-cyber-border hover:border-cyber-neonGreen flex flex-col items-center gap-1 transition">
-            <div class="w-10 h-10 rounded-lg bg-cyber-black flex items-center justify-center text-emerald-400 group-hover:scale-110 transition">
-              <i class="fa-solid fa-code text-lg"></i>
-            </div>
-            <span class="text-[10px] font-mono text-slate-400">Matrix</span>
-          </button>
-
-          <button onclick="loadPresetImage('battery')" class="group p-2 rounded-xl bg-cyber-dark border border-cyber-border hover:border-yellow-400 flex flex-col items-center gap-1 transition">
-            <div class="w-10 h-10 rounded-lg bg-cyber-black flex items-center justify-center text-yellow-400 group-hover:scale-110 transition">
-              <i class="fa-solid fa-bolt text-lg"></i>
-            </div>
-            <span class="text-[10px] font-mono text-slate-400">Charge</span>
-          </button>
-
-          <button onclick="loadPresetImage('skull')" class="group p-2 rounded-xl bg-cyber-dark border border-cyber-border hover:border-purple-400 flex flex-col items-center gap-1 transition">
-            <div class="w-10 h-10 rounded-lg bg-cyber-black flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
-              <i class="fa-solid fa-skull text-lg"></i>
-            </div>
-            <span class="text-[10px] font-mono text-slate-400">Danger</span>
-          </button>
-        </div>
+      <div class="bg-cyber-card/80 border border-cyber-border rounded-xl p-3 flex flex-col gap-1">
+        <span class="text-slate-500 text-[10px]">ACTIVE STATE</span>
+        <span id="activeCount" class="text-cyber-cyan text-base font-bold font-orbitron">0 / 4 ACTIVE</span>
       </div>
-    </section>
-
-    <!-- RIGHT COLUMN: RELAYS & EMO EXPRESSIONS (5 Columns) -->
-    <section class="lg:col-span-5 flex flex-col gap-6">
-      
-      <!-- 4-Relay Board Control Grid (dheeraj_emo_hub_9921) -->
-      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl">
-        <div class="flex justify-between items-center mb-4">
-          <div class="flex items-center gap-2">
-            <i class="fa-solid fa-plug text-cyber-neonGreen"></i>
-            <h2 class="font-orbitron font-semibold text-sm tracking-wider text-white">4-RELAY APPLIANCE HUB</h2>
-          </div>
-          <span class="text-[11px] font-mono text-slate-400">ESP-NOW Channel Sync</span>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3.5">
-          <!-- Relay 1: Light 1 -->
-          <div class="bg-cyber-dark p-3.5 rounded-xl border border-cyber-border flex flex-col justify-between h-28 relative overflow-hidden group">
-            <div class="flex justify-between items-start">
-              <div class="w-8 h-8 rounded-lg bg-cyber-card border border-cyber-border flex items-center justify-center text-cyber-cyan">
-                <i class="fa-regular fa-lightbulb"></i>
-              </div>
-              <span id="relayStatus1" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">OFF</span>
-            </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs font-semibold text-white">LIGHT 1</span>
-              <button onclick="toggleRelay(1)" id="btnRelay1" class="w-10 h-6 bg-slate-700 rounded-full transition-colors relative flex items-center p-1">
-                <span class="w-4 h-4 rounded-full bg-white transition-transform transform translate-x-0"></span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Relay 2: Light 2 -->
-          <div class="bg-cyber-dark p-3.5 rounded-xl border border-cyber-border flex flex-col justify-between h-28 relative overflow-hidden group">
-            <div class="flex justify-between items-start">
-              <div class="w-8 h-8 rounded-lg bg-cyber-card border border-cyber-border flex items-center justify-center text-cyber-cyan">
-                <i class="fa-solid fa-lightbulb"></i>
-              </div>
-              <span id="relayStatus2" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">OFF</span>
-            </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs font-semibold text-white">LIGHT 2</span>
-              <button onclick="toggleRelay(2)" id="btnRelay2" class="w-10 h-6 bg-slate-700 rounded-full transition-colors relative flex items-center p-1">
-                <span class="w-4 h-4 rounded-full bg-white transition-transform transform translate-x-0"></span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Relay 3: Fan -->
-          <div class="bg-cyber-dark p-3.5 rounded-xl border border-cyber-border flex flex-col justify-between h-28 relative overflow-hidden group">
-            <div class="flex justify-between items-start">
-              <div class="w-8 h-8 rounded-lg bg-cyber-card border border-cyber-border flex items-center justify-center text-cyber-cyan">
-                <i class="fa-solid fa-fan" id="fanIcon"></i>
-              </div>
-              <span id="relayStatus3" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">OFF</span>
-            </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs font-semibold text-white">FAN</span>
-              <button onclick="toggleRelay(3)" id="btnRelay3" class="w-10 h-6 bg-slate-700 rounded-full transition-colors relative flex items-center p-1">
-                <span class="w-4 h-4 rounded-full bg-white transition-transform transform translate-x-0"></span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Relay 4: TV -->
-          <div class="bg-cyber-dark p-3.5 rounded-xl border border-cyber-border flex flex-col justify-between h-28 relative overflow-hidden group">
-            <div class="flex justify-between items-start">
-              <div class="w-8 h-8 rounded-lg bg-cyber-card border border-cyber-border flex items-center justify-center text-cyber-cyan">
-                <i class="fa-solid fa-tv"></i>
-              </div>
-              <span id="relayStatus4" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">OFF</span>
-            </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs font-semibold text-white">TV</span>
-              <button onclick="toggleRelay(4)" id="btnRelay4" class="w-10 h-6 bg-slate-700 rounded-full transition-colors relative flex items-center p-1">
-                <span class="w-4 h-4 rounded-full bg-white transition-transform transform translate-x-0"></span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Master Switch -->
-        <div class="mt-4 pt-3 border-t border-cyber-border/60 flex gap-2">
-          <button onclick="setAllRelays(1)" class="flex-1 py-2 rounded-lg bg-cyber-neonGreen/10 border border-cyber-neonGreen/30 text-cyber-neonGreen font-mono text-xs font-semibold hover:bg-cyber-neonGreen/20 transition">
-            ALL ON
-          </button>
-          <button onclick="setAllRelays(0)" class="flex-1 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs font-semibold hover:bg-rose-500/20 transition">
-            ALL OFF
-          </button>
-        </div>
+      <div class="bg-cyber-card/80 border border-cyber-border rounded-xl p-3 flex flex-col gap-1">
+        <span class="text-slate-500 text-[10px]">MQTT BROKER</span>
+        <span class="text-slate-300 text-xs font-semibold truncate">broker.emqx.io</span>
       </div>
-
-      <!-- Quick Expression / Mood Triggers -->
-      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl">
-        <h3 class="font-orbitron text-xs font-semibold tracking-wider text-slate-300 mb-3 flex items-center gap-2">
-          <i class="fa-regular fa-face-smile text-cyber-cyan"></i>
-          TRIGGER ROBOT EXPRESSION
-        </h3>
-        <p class="text-[11px] text-slate-400 mb-3">Instant trigger for EMO's 21 expressions over MQTT protocol.</p>
-        
-        <div class="grid grid-cols-3 gap-2.5">
-          <button onclick="sendEmotion('neutral')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-cyber-cyan/10 border border-cyber-border hover:border-cyber-cyan text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">👀</span>
-            <span>Neutral</span>
-          </button>
-          <button onclick="sendEmotion('happy')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-cyber-cyan/10 border border-cyber-border hover:border-cyber-cyan text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">😄</span>
-            <span>Happy</span>
-          </button>
-          <button onclick="sendEmotion('laughing')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-cyber-cyan/10 border border-cyber-border hover:border-cyber-cyan text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">😆</span>
-            <span>Laugh</span>
-          </button>
-          <button onclick="sendEmotion('angry')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-rose-500/10 border border-cyber-border hover:border-rose-500 text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">😡</span>
-            <span>Angry</span>
-          </button>
-          <button onclick="sendEmotion('loving')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-pink-500/10 border border-cyber-border hover:border-pink-500 text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">💖</span>
-            <span>Loving</span>
-          </button>
-          <button onclick="sendEmotion('sleepy')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-blue-500/10 border border-cyber-border hover:border-blue-500 text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">😴</span>
-            <span>Sleepy</span>
-          </button>
-          <button onclick="sendEmotion('cool')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-purple-500/10 border border-cyber-border hover:border-purple-500 text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">😎</span>
-            <span>Cool</span>
-          </button>
-          <button onclick="sendEmotion('crying')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-cyan-500/10 border border-cyber-border hover:border-cyan-500 text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">😭</span>
-            <span>Crying</span>
-          </button>
-          <button onclick="sendEmotion('winking')" class="p-2.5 rounded-xl bg-cyber-dark hover:bg-yellow-500/10 border border-cyber-border hover:border-yellow-500 text-xs font-mono text-slate-200 flex flex-col items-center gap-1 transition">
-            <span class="text-lg">😉</span>
-            <span>Wink</span>
-          </button>
-        </div>
+      <div class="bg-cyber-card/80 border border-cyber-border rounded-xl p-3 flex flex-col gap-1">
+        <span class="text-slate-500 text-[10px]">BASE TOPIC</span>
+        <span class="text-emerald-400 text-xs font-semibold truncate">dheeraj_emo_hub</span>
       </div>
+    </div>
 
-      <!-- Live Terminal / Activity Log -->
-      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl flex flex-col flex-1">
-        <div class="flex justify-between items-center mb-2">
-          <span class="font-orbitron text-xs font-semibold text-slate-300 flex items-center gap-2">
-            <i class="fa-solid fa-terminal text-cyber-cyan"></i>
-            COMMUNICATION LOG
+    <!-- 4-RELAY APPLIANCE CARDS (2x2 GRID) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+
+      <!-- CARD 1: LIGHT 1 (GPIO 18) -->
+      <div id="card1" class="bg-cyber-card border border-cyber-border hover:border-slate-600 rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-3.5">
+            <div id="iconBox1" class="w-12 h-12 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-center text-slate-500 text-xl transition-all duration-300">
+              <i class="fa-regular fa-lightbulb"></i>
+            </div>
+            <div>
+              <h2 class="font-orbitron font-bold text-sm tracking-wide text-white">LIGHT 1</h2>
+              <p class="text-[11px] font-mono text-slate-400 mt-0.5">GPIO 18 // Living Room</p>
+            </div>
+          </div>
+          <span id="pill1" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-slate-700 bg-slate-800 text-slate-400 font-semibold transition-all duration-300">
+            OFF
           </span>
-          <button onclick="clearLogs()" class="text-[10px] font-mono text-slate-500 hover:text-slate-300">CLEAR</button>
         </div>
-        <div id="logConsole" class="bg-cyber-black p-3 rounded-xl border border-cyber-border font-mono text-[11px] text-slate-400 h-32 overflow-y-auto space-y-1">
-          <div class="text-cyber-cyan">> Hub initialized. Ready to link with EMO robot.</div>
+
+        <div class="flex justify-between items-center mt-6 pt-4 border-t border-cyber-border/60">
+          <span class="text-xs font-mono text-slate-500">SWITCH STATE</span>
+          <!-- Cyber Toggle -->
+          <button onclick="toggleRelay(1)" id="btnToggle1" aria-label="Toggle Light 1" class="w-14 h-8 bg-slate-800 rounded-full transition-all duration-300 relative flex items-center p-1 cursor-pointer border border-slate-700 focus:outline-none">
+            <span id="thumb1" class="w-6 h-6 rounded-full bg-slate-400 transition-transform duration-300 transform translate-x-0 shadow-sm flex items-center justify-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+            </span>
+          </button>
         </div>
       </div>
 
-    </section>
+      <!-- CARD 2: LIGHT 2 (GPIO 19) -->
+      <div id="card2" class="bg-cyber-card border border-cyber-border hover:border-slate-600 rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-3.5">
+            <div id="iconBox2" class="w-12 h-12 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-center text-slate-500 text-xl transition-all duration-300">
+              <i class="fa-solid fa-lightbulb"></i>
+            </div>
+            <div>
+              <h2 class="font-orbitron font-bold text-sm tracking-wide text-white">LIGHT 2</h2>
+              <p class="text-[11px] font-mono text-slate-400 mt-0.5">GPIO 19 // Study Lamp</p>
+            </div>
+          </div>
+          <span id="pill2" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-slate-700 bg-slate-800 text-slate-400 font-semibold transition-all duration-300">
+            OFF
+          </span>
+        </div>
+
+        <div class="flex justify-between items-center mt-6 pt-4 border-t border-cyber-border/60">
+          <span class="text-xs font-mono text-slate-500">SWITCH STATE</span>
+          <button onclick="toggleRelay(2)" id="btnToggle2" aria-label="Toggle Light 2" class="w-14 h-8 bg-slate-800 rounded-full transition-all duration-300 relative flex items-center p-1 cursor-pointer border border-slate-700 focus:outline-none">
+            <span id="thumb2" class="w-6 h-6 rounded-full bg-slate-400 transition-transform duration-300 transform translate-x-0 shadow-sm flex items-center justify-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- CARD 3: FAN (GPIO 21) -->
+      <div id="card3" class="bg-cyber-card border border-cyber-border hover:border-slate-600 rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-3.5">
+            <div id="iconBox3" class="w-12 h-12 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-center text-slate-500 text-xl transition-all duration-300">
+              <i class="fa-solid fa-fan" id="fanSpinner"></i>
+            </div>
+            <div>
+              <h2 class="font-orbitron font-bold text-sm tracking-wide text-white">FAN</h2>
+              <p class="text-[11px] font-mono text-slate-400 mt-0.5">GPIO 21 // Main Ceiling Fan</p>
+            </div>
+          </div>
+          <span id="pill3" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-slate-700 bg-slate-800 text-slate-400 font-semibold transition-all duration-300">
+            OFF
+          </span>
+        </div>
+
+        <div class="flex justify-between items-center mt-6 pt-4 border-t border-cyber-border/60">
+          <span class="text-xs font-mono text-slate-500">SWITCH STATE</span>
+          <button onclick="toggleRelay(3)" id="btnToggle3" aria-label="Toggle Fan" class="w-14 h-8 bg-slate-800 rounded-full transition-all duration-300 relative flex items-center p-1 cursor-pointer border border-slate-700 focus:outline-none">
+            <span id="thumb3" class="w-6 h-6 rounded-full bg-slate-400 transition-transform duration-300 transform translate-x-0 shadow-sm flex items-center justify-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- CARD 4: TV (GPIO 22) -->
+      <div id="card4" class="bg-cyber-card border border-cyber-border hover:border-slate-600 rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-3.5">
+            <div id="iconBox4" class="w-12 h-12 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-center text-slate-500 text-xl transition-all duration-300">
+              <i class="fa-solid fa-tv" id="tvIcon"></i>
+            </div>
+            <div>
+              <h2 class="font-orbitron font-bold text-sm tracking-wide text-white">TELEVISION</h2>
+              <p class="text-[11px] font-mono text-slate-400 mt-0.5">GPIO 22 // Smart Display / TV</p>
+            </div>
+          </div>
+          <span id="pill4" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-slate-700 bg-slate-800 text-slate-400 font-semibold transition-all duration-300">
+            OFF
+          </span>
+        </div>
+
+        <div class="flex justify-between items-center mt-6 pt-4 border-t border-cyber-border/60">
+          <span class="text-xs font-mono text-slate-500">SWITCH STATE</span>
+          <button onclick="toggleRelay(4)" id="btnToggle4" aria-label="Toggle TV" class="w-14 h-8 bg-slate-800 rounded-full transition-all duration-300 relative flex items-center p-1 cursor-pointer border border-slate-700 focus:outline-none">
+            <span id="thumb4" class="w-6 h-6 rounded-full bg-slate-400 transition-transform duration-300 transform translate-x-0 shadow-sm flex items-center justify-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MASTER CONTROLS & QUICK ACTIONS -->
+    <div class="bg-cyber-card border border-cyber-border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2.5 w-full sm:w-auto">
+        <span class="font-orbitron font-semibold text-xs tracking-wider text-slate-300">MASTER CONTROLS:</span>
+      </div>
+
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <button onclick="setAllRelays(1)" class="flex-1 sm:flex-initial py-2.5 px-6 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-orbitron font-bold text-xs tracking-wider transition active:scale-95 shadow-emeraldGlow flex items-center justify-center gap-2">
+          <i class="fa-solid fa-power-off"></i> ALL ON
+        </button>
+        <button onclick="setAllRelays(0)" class="flex-1 sm:flex-initial py-2.5 px-6 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/40 text-rose-400 font-orbitron font-bold text-xs tracking-wider transition active:scale-95 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-ban"></i> ALL OFF
+        </button>
+      </div>
+    </div>
+
+    <!-- TERMINAL ACTIVITY & TELEMETRY CONSOLE -->
+    <div class="bg-cyber-card border border-cyber-border rounded-2xl p-4 sm:p-5 flex flex-col">
+      <div class="flex justify-between items-center mb-2.5">
+        <div class="flex items-center gap-2 font-mono text-xs font-semibold text-slate-300">
+          <i class="fa-solid fa-terminal text-cyber-cyan"></i>
+          <span>LIVE COMMAND STREAM</span>
+        </div>
+        <button onclick="clearConsole()" class="text-[10px] font-mono text-slate-500 hover:text-slate-300 transition">
+          CLEAR LOG
+        </button>
+      </div>
+
+      <div id="terminalStream" class="bg-cyber-black p-3.5 rounded-xl border border-cyber-border font-mono text-[11px] text-slate-400 h-36 overflow-y-auto space-y-1">
+        <div class="text-cyber-cyan">> System ready. Initializing WebSockets MQTT Link...</div>
+      </div>
+    </div>
+
   </main>
 
-  <!-- CAMERA MODAL -->
-  <div id="cameraModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-cyber-card border border-cyber-border rounded-2xl max-w-md w-full p-5 shadow-2xl relative">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="font-orbitron font-semibold text-white text-sm">CAPTURE FOR EMO</h3>
-        <button onclick="closeCameraModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="w-full aspect-square bg-black rounded-xl overflow-hidden relative border border-cyber-border">
-        <video id="cameraVideo" autoplay playsinline class="w-full h-full object-cover"></video>
-      </div>
-      <div class="mt-4 flex gap-3">
-        <button onclick="takeSnapshot()" class="flex-1 py-3 bg-cyber-cyan hover:bg-cyan-400 text-black font-bold font-orbitron rounded-xl text-xs transition">
-          <i class="fa-solid fa-camera mr-1"></i> SNAPSHOT
-        </button>
-        <button onclick="closeCameraModal()" class="py-3 px-4 bg-cyber-dark text-slate-300 rounded-xl text-xs font-mono">
-          CANCEL
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MQTT SETTINGS MODAL -->
-  <div id="mqttModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-cyber-card border border-cyber-border rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
-      <div class="flex justify-between items-center mb-4 border-b border-cyber-border pb-3">
-        <h3 class="font-orbitron font-bold text-white text-base flex items-center gap-2">
-          <i class="fa-solid fa-network-wired text-cyber-cyan"></i>
-          MQTT LINK CONFIGURATION
-        </h3>
-        <button onclick="toggleMqttModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+  <!-- CYBERPUNK HACKER FOOTER -->
+  <footer class="mt-auto border-t border-cyber-border/80 bg-cyber-black/95 px-4 py-4 sm:px-8 z-30">
+    <div class="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left font-mono">
+      <!-- Hacker Signature -->
+      <div class="flex items-center gap-2 text-xs tracking-wider">
+        <span class="text-emerald-400 font-bold">$ root@emo-hub:</span>
+        <span class="text-cyber-cyan font-bold tracking-widest drop-shadow-[0_0_8px_rgba(0,245,255,0.7)] flex items-center gap-1.5">
+          <i class="fa-solid fa-code text-[11px] text-emerald-400"></i>
+          MADE BY DHEERAJ
+        </span>
+        <span class="inline-block w-2 h-4 bg-emerald-400 animate-pulse"></span>
       </div>
 
-      <div class="space-y-4 text-xs font-mono">
-        <div>
-          <label class="block text-slate-400 mb-1">BROKER WEBSOCKET HOST</label>
-          <input type="text" id="cfgBrokerHost" value="broker.emqx.io" class="w-full bg-cyber-dark border border-cyber-border focus:border-cyber-cyan rounded-xl p-2.5 text-white outline-none">
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-slate-400 mb-1">WS PORT (SSL)</label>
-            <input type="number" id="cfgBrokerPort" value="8084" class="w-full bg-cyber-dark border border-cyber-border focus:border-cyber-cyan rounded-xl p-2.5 text-white outline-none">
-          </div>
-          <div>
-            <label class="block text-slate-400 mb-1">WS PATH</label>
-            <input type="text" id="cfgBrokerPath" value="/mqtt" class="w-full bg-cyber-dark border border-cyber-border focus:border-cyber-cyan rounded-xl p-2.5 text-white outline-none">
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-slate-400 mb-1">BASE TOPIC (EMO HUB)</label>
-          <input type="text" id="cfgBaseTopic" value="dheeraj_emo_hub_9921" class="w-full bg-cyber-dark border border-cyber-border focus:border-cyber-cyan rounded-xl p-2.5 text-white outline-none">
-        </div>
-
-        <div>
-          <label class="block text-slate-400 mb-1">TRANSMISSION MODE</label>
-          <select id="cfgSendMode" class="w-full bg-cyber-dark border border-cyber-border focus:border-cyber-cyan rounded-xl p-2.5 text-white outline-none">
-            <option value="base64_jpeg">Base64 Compressed JPEG (Standard)</option>
-            <option value="rgb565_raw">RGB565 Raw Buffer (Xiaozhi Fast)</option>
-            <option value="mcp_preview">MCP JSON Command (self.screen.preview_image)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="mt-6 flex justify-end gap-3">
-        <button onclick="reconnectMqtt()" class="px-5 py-2.5 bg-cyber-cyan hover:bg-cyan-400 text-black font-bold font-orbitron rounded-xl text-xs transition">
-          APPLY & CONNECT
-        </button>
+      <!-- Live Telemetry Tag -->
+      <div class="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
+        <span class="flex items-center gap-1.5 text-cyber-cyan bg-cyber-cyan/10 border border-cyber-cyan/30 px-2.5 py-0.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyber-cyan animate-ping"></span>
+          ESP32-S3 CORE // ACTIVE
+        </span>
+        <span class="text-slate-600 hidden md:inline">CHANNEL DYNAMIC SYNC</span>
       </div>
     </div>
-  </div>
+  </footer>
 
-  <!-- JAVASCRIPT APP LOGIC -->
+  <!-- SCRIPT LOGIC -->
   <script>
-    // System State
+    // State Tracking
+    const relayStates = { 1: 0, 2: 0, 3: 0, 4: 0 };
     let mqttClient = null;
     let isConnected = false;
-    let currentFilter = 'normal';
-    let loadedImage = null;
-    let cameraStream = null;
+    let pingStartTime = 0;
 
-    // Relay States
-    const relayStates = { 1: 0, 2: 0, 3: 0, 4: 0 };
-
-    // DOM Elements
-    const canvas = document.getElementById('emoCanvas');
-    const ctx = canvas.getContext('2d');
-    const canvasPlaceholder = document.getElementById('canvasPlaceholder');
-    const sliderBrightness = document.getElementById('sliderBrightness');
-    const sliderContrast = document.getElementById('sliderContrast');
-    const logConsole = document.getElementById('logConsole');
-
-    // Default Config
-    let config = {
+    const MQTT_CONFIG = {
       host: 'broker.emqx.io',
       port: 8084,
       path: '/mqtt',
-      baseTopic: 'dheeraj_emo_hub_9921',
-      sendMode: 'base64_jpeg'
+      topicBase: 'dheeraj_emo_hub_9921',
+      clientId: 'WebRelay_' + Math.random().toString(16).substring(2, 9)
     };
 
-    // Logging helper
-    function appendLog(msg, type = 'info') {
-      const el = document.createElement('div');
+    // Web Audio Synthesizer for Tactile Clicking Sounds
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      },
+      playClick(state) {
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          const now = this.ctx.currentTime;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(state ? 880 : 440, now);
+          osc.frequency.exponentialRampToValueAtTime(state ? 1200 : 220, now + 0.05);
+
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+          osc.start(now);
+          osc.stop(now + 0.06);
+        } catch (e) {
+          // Fallback ignore if audio blocked
+        }
+      }
+    };
+
+    // Terminal Logging
+    function logStream(message, type = 'info') {
+      const container = document.getElementById('terminalStream');
       const time = new Date().toLocaleTimeString();
-      let colorClass = 'text-slate-400';
-      if (type === 'success') colorClass = 'text-cyber-neonGreen';
-      if (type === 'error') colorClass = 'text-rose-400';
-      if (type === 'warn') colorClass = 'text-yellow-400';
-      if (type === 'cyan') colorClass = 'text-cyber-cyan';
+      const row = document.createElement('div');
+      
+      let color = 'text-slate-400';
+      if (type === 'success') color = 'text-emerald-400 font-semibold';
+      if (type === 'cyan') color = 'text-cyber-cyan';
+      if (type === 'error') color = 'text-rose-400';
+      if (type === 'warn') color = 'text-amber-400';
 
-      el.className = colorClass;
-      el.innerHTML = `<span class="text-slate-600">[${time}]</span> ${msg}`;
-      logConsole.appendChild(el);
-      logConsole.scrollTop = logConsole.scrollHeight;
+      row.className = color;
+      row.innerHTML = `<span class="text-slate-600">[${time}]</span> ${message}`;
+      container.appendChild(row);
+      container.scrollTop = container.scrollHeight;
     }
 
-    function clearLogs() {
-      logConsole.innerHTML = '';
-      appendLog('Logs cleared.', 'cyan');
+    function clearConsole() {
+      document.getElementById('terminalStream').innerHTML = '';
+      logStream('Terminal log cleared.', 'cyan');
     }
 
-    // ==========================================
-    // MQTT CONNECTION ENGINE (PAHO MQTT WS)
-    // ==========================================
-    function initMQTT() {
-      const clientId = 'EMO_WebHub_' + Math.random().toString(16).substr(2, 8);
-      appendLog(`Connecting to ${config.host}:${config.port}${config.path}...`, 'cyan');
+    // MQTT Connection Handler
+    function connectMQTT() {
+      updateBadge('connecting');
+      logStream(`Initiating secure WSS connection to ${MQTT_CONFIG.host}:${MQTT_CONFIG.port}...`, 'cyan');
 
-      updateStatusUI('connecting');
-
-      mqttClient = new Paho.MQTT.Client(config.host, Number(config.port), config.path, clientId);
+      mqttClient = new Paho.MQTT.Client(MQTT_CONFIG.host, Number(MQTT_CONFIG.port), MQTT_CONFIG.path, MQTT_CONFIG.clientId);
 
       mqttClient.onConnectionLost = onConnectionLost;
       mqttClient.onMessageArrived = onMessageArrived;
@@ -568,504 +433,187 @@
 
       try {
         mqttClient.connect(options);
-      } catch (err) {
-        appendLog('MQTT connect error: ' + err.message, 'error');
-        updateStatusUI('disconnected');
+      } catch (e) {
+        logStream('Connection exception: ' + e.message, 'error');
+        updateBadge('disconnected');
       }
     }
 
     function onConnectSuccess() {
       isConnected = true;
-      appendLog('Connected to MQTT Broker successfully!', 'success');
-      updateStatusUI('connected');
+      updateBadge('connected');
+      logStream('Connected to broker.emqx.io successfully!', 'success');
 
-      // Subscribe to EMO status & relay feedback
-      const relayFeedbackTopic = `${config.baseTopic}/status/#`;
-      mqttClient.subscribe(relayFeedbackTopic, { qos: 1 });
-      appendLog(`Subscribed to: ${relayFeedbackTopic}`, 'info');
+      // Measure Ping / Latency
+      pingStartTime = performance.now();
+      const statusTopic = `${MQTT_CONFIG.topicBase}/status/#`;
+      mqttClient.subscribe(statusTopic, { qos: 1 });
+      logStream(`Subscribed to topic: ${statusTopic}`, 'info');
+
+      // Request initial status ping
+      const pingTopic = `${MQTT_CONFIG.topicBase}/ping`;
+      publishRaw(pingTopic, 'PING');
     }
 
     function onConnectFailure(err) {
       isConnected = false;
-      appendLog('Connection failed: ' + err.errorMessage, 'error');
-      updateStatusUI('disconnected');
-      // Retry in 5s
-      setTimeout(initMQTT, 5000);
+      updateBadge('disconnected');
+      logStream('MQTT connection failed: ' + err.errorMessage, 'error');
+      setTimeout(connectMQTT, 5000);
     }
 
-    function onConnectionLost(responseObject) {
+    function onConnectionLost(response) {
       isConnected = false;
-      if (responseObject.errorCode !== 0) {
-        appendLog('Connection lost: ' + responseObject.errorMessage, 'error');
+      updateBadge('disconnected');
+      if (response.errorCode !== 0) {
+        logStream('MQTT connection drop: ' + response.errorMessage, 'error');
       }
-      updateStatusUI('disconnected');
-      setTimeout(initMQTT, 4000);
+      setTimeout(connectMQTT, 4000);
     }
 
     function onMessageArrived(message) {
-      appendLog(`Msg [${message.destinationName}] : ${message.payloadString}`, 'info');
-      
-      // Match status topic dheeraj_emo_hub_9921/status/dev1
-      const match = message.destinationName.match(/status\/dev(\d+)/);
+      const topic = message.destinationName;
+      const payload = message.payloadString;
+
+      // Calculate simple round-trip ping if pong received
+      if (topic.includes('status') && pingStartTime > 0) {
+        const latency = Math.round(performance.now() - pingStartTime);
+        document.getElementById('pingDisplay').innerText = `${latency} ms`;
+        pingStartTime = 0;
+      }
+
+      // Relay State Pattern: dheeraj_emo_hub_9921/status/dev1
+      const match = topic.match(/status\/dev(\d+)/);
       if (match) {
         const devId = parseInt(match[1]);
         try {
-          const data = JSON.parse(message.payloadString);
-          if (data && typeof data.state !== 'undefined') {
-            updateRelayUI(devId, data.state);
+          const parsed = JSON.parse(payload);
+          if (typeof parsed.state !== 'undefined') {
+            updateCardUI(devId, parsed.state);
+            logStream(`Device [${devId}] confirmed state -> ${parsed.state === 1 ? 'ON' : 'OFF'}`, 'success');
           }
-        } catch(e) {
-          const st = parseInt(message.payloadString);
-          if (!isNaN(st)) updateRelayUI(devId, st);
+        } catch (e) {
+          const st = parseInt(payload);
+          if (!isNaN(st)) {
+            updateCardUI(devId, st);
+            logStream(`Device [${devId}] sync -> ${st === 1 ? 'ON' : 'OFF'}`, 'success');
+          }
         }
       }
     }
 
-    function publishMqtt(subTopic, payloadStr) {
-      if (!isConnected || !mqttClient) {
-        appendLog('Cannot send: MQTT Disconnected!', 'error');
-        showFeedback('MQTT Disconnected! Please check broker link.', false);
-        return false;
-      }
-      const fullTopic = `${config.baseTopic}/${subTopic}`;
-      const message = new Paho.MQTT.Message(payloadStr);
-      message.destinationName = fullTopic;
-      message.qos = 1;
-      mqttClient.send(message);
-      appendLog(`Sent to [${fullTopic}]: ${payloadStr.length > 80 ? payloadStr.substring(0, 80) + '...' : payloadStr}`, 'cyan');
+    function publishRaw(topic, payload) {
+      if (!isConnected || !mqttClient) return false;
+      const msg = new Paho.MQTT.Message(payload);
+      msg.destinationName = topic;
+      msg.qos = 1;
+      mqttClient.send(msg);
       return true;
     }
 
-    function updateStatusUI(status) {
-      const badge = document.getElementById('mqttStatusBadge');
+    function updateBadge(status) {
+      const badge = document.getElementById('mqttBadge');
+      const dot = document.getElementById('mqttDot');
       const text = document.getElementById('mqttStatusText');
 
       if (status === 'connected') {
-        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyber-neonGreen/40 bg-cyber-neonGreen/10 text-cyber-neonGreen font-mono text-xs shadow-glowSm';
-        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-cyber-neonGreen"></span><span>CONNECTED</span>';
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-mono text-xs shadow-sm';
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shadow-emeraldGlow';
+        text.innerText = 'ONLINE';
       } else if (status === 'connecting') {
-        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-500/40 bg-yellow-500/10 text-yellow-400 font-mono text-xs';
-        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-yellow-400 animate-ping"></span><span>LINKING...</span>';
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 font-mono text-xs';
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+        text.innerText = 'CONNECTING';
       } else {
         badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400 font-mono text-xs';
-        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>DISCONNECTED</span>';
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        text.innerText = 'OFFLINE';
       }
     }
 
-    // ==========================================
-    // IMAGE HANDLING & CANVAS FILTER ENGINE
-    // ==========================================
-    function handleFileSelect(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const img = new Image();
-        img.onload = function() {
-          loadedImage = img;
-          canvasPlaceholder.classList.add('opacity-0');
-          setTimeout(() => canvasPlaceholder.classList.add('hidden'), 300);
-          redrawCanvas();
-          appendLog(`Loaded image: ${file.name} (${img.width}x${img.height})`, 'info');
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function redrawCanvas() {
-      if (!loadedImage) return;
-
-      // Clear Canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Center crop & scale for square 320x320
-      const size = Math.min(loadedImage.width, loadedImage.height);
-      const sx = (loadedImage.width - size) / 2;
-      const sy = (loadedImage.height - size) / 2;
-
-      // Apply CSS Filters for Contrast & Brightness
-      const bVal = sliderBrightness.value;
-      const cVal = sliderContrast.value;
-      ctx.filter = `brightness(${bVal}%) contrast(${cVal}%)`;
-
-      ctx.drawImage(loadedImage, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
-      ctx.filter = 'none';
-
-      // Pixel-level custom filters
-      if (currentFilter !== 'normal') {
-        applyPixelFilters(currentFilter);
-      }
-    }
-
-    function applyPixelFilters(type) {
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imgData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        let r = data[i];
-        let g = data[i+1];
-        let b = data[i+2];
-
-        if (type === 'grayscale') {
-          const avg = 0.299 * r + 0.587 * g + 0.114 * b;
-          data[i] = avg;
-          data[i+1] = avg;
-          data[i+2] = avg;
-        } else if (type === 'cyber') {
-          // Tint to bright cyber cyan & teal tones
-          const avg = (r + g + b) / 3;
-          data[i] = Math.min(255, avg * 0.2);     // Low Red
-          data[i+1] = Math.min(255, avg * 1.2);   // High Green
-          data[i+2] = Math.min(255, avg * 1.4);   // High Blue
-        } else if (type === 'invert') {
-          data[i] = 255 - r;
-          data[i+1] = 255 - g;
-          data[i+2] = 255 - b;
-        } else if (type === 'threshold') {
-          const avg = 0.299 * r + 0.587 * g + 0.114 * b;
-          const v = avg > 120 ? 255 : 0;
-          data[i] = v;
-          data[i+1] = v;
-          data[i+2] = v;
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-    }
-
-    function applyFilter(filterName) {
-      currentFilter = filterName;
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.remove('border-cyber-cyan', 'bg-cyber-cyan/20', 'text-cyber-cyan');
-        btn.classList.add('border-cyber-border', 'bg-cyber-card', 'text-slate-300');
-      });
-      event.target.classList.add('border-cyber-cyan', 'bg-cyber-cyan/20', 'text-cyber-cyan');
-      redrawCanvas();
-    }
-
-    function resetFilters() {
-      currentFilter = 'normal';
-      sliderBrightness.value = 100;
-      sliderContrast.value = 100;
-      document.getElementById('valBrightness').innerText = '100%';
-      document.getElementById('valContrast').innerText = '100%';
-      redrawCanvas();
-    }
-
-    sliderBrightness.addEventListener('input', (e) => {
-      document.getElementById('valBrightness').innerText = `${e.target.value}%`;
-      redrawCanvas();
-    });
-
-    sliderContrast.addEventListener('input', (e) => {
-      document.getElementById('valContrast').innerText = `${e.target.value}%`;
-      redrawCanvas();
-    });
-
-    // Preset Vectors rendered to canvas directly
-    function loadPresetImage(type) {
-      canvasPlaceholder.classList.add('opacity-0');
-      setTimeout(() => canvasPlaceholder.classList.add('hidden'), 300);
-
-      ctx.clearRect(0, 0, 320, 320);
-      ctx.fillStyle = '#07090e';
-      ctx.fillRect(0, 0, 320, 320);
-
-      if (type === 'robot') {
-        // EMO signature Eyes on canvas
-        ctx.fillStyle = '#00f5ff';
-        // Left Eye
-        roundRect(ctx, 44, 115, 96, 84, 26, true, false);
-        // Right Eye
-        roundRect(ctx, 180, 115, 96, 84, 26, true, false);
-      } else if (type === 'heart') {
-        ctx.fillStyle = '#ff2a85';
-        ctx.beginPath();
-        const topCurveHeight = 320 * 0.3;
-        ctx.moveTo(160, 260);
-        ctx.bezierCurveTo(160, 240, 70, 160, 70, 100);
-        ctx.bezierCurveTo(70, 50, 120, 50, 160, 95);
-        ctx.bezierCurveTo(200, 50, 250, 50, 250, 100);
-        ctx.bezierCurveTo(250, 160, 160, 240, 160, 260);
-        ctx.closePath();
-        ctx.fill();
-      } else if (type === 'game') {
-        ctx.fillStyle = '#2d6fe1';
-        roundRect(ctx, 50, 100, 220, 120, 30, true, false);
-        ctx.fillStyle = '#ffffff';
-        // D-Pad
-        ctx.fillRect(80, 145, 45, 15);
-        ctx.fillRect(95, 130, 15, 45);
-        // Buttons
-        ctx.fillStyle = '#ffd600';
-        ctx.beginPath(); ctx.arc(220, 140, 10, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#00ff88';
-        ctx.beginPath(); ctx.arc(245, 160, 10, 0, Math.PI*2); ctx.fill();
-      } else if (type === 'matrix') {
-        ctx.fillStyle = '#00ff88';
-        ctx.font = '22px monospace';
-        for (let i = 0; i < 8; i++) {
-          ctx.fillText('10101100101', 35, 60 + i * 30);
-        }
-      } else if (type === 'battery') {
-        ctx.strokeStyle = '#ffd600';
-        ctx.lineWidth = 10;
-        roundRect(ctx, 70, 110, 170, 100, 16, false, true);
-        ctx.fillStyle = '#ffd600';
-        ctx.fillRect(240, 140, 16, 40);
-        // Thunder bolt
-        ctx.beginPath();
-        ctx.moveTo(165, 80);
-        ctx.lineTo(135, 160);
-        ctx.lineTo(165, 160);
-        ctx.lineTo(150, 240);
-        ctx.lineTo(190, 150);
-        ctx.lineTo(160, 150);
-        ctx.closePath();
-        ctx.fill();
-      } else if (type === 'skull') {
-        ctx.fillStyle = '#b55fe6';
-        ctx.beginPath(); ctx.arc(160, 140, 70, 0, Math.PI*2); ctx.fill();
-        ctx.fillRect(130, 190, 60, 40);
-        ctx.fillStyle = '#07090e';
-        ctx.beginPath(); ctx.arc(135, 145, 18, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(185, 145, 18, 0, Math.PI*2); ctx.fill();
-      }
-
-      // Convert canvas to image object
-      const img = new Image();
-      img.onload = () => { loadedImage = img; };
-      img.src = canvas.toDataURL();
-      appendLog(`Preset '${type}' loaded. Ready to send.`, 'cyan');
-    }
-
-    function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.lineTo(x + width - radius, y);
-      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-      ctx.lineTo(x + width, y + height - radius);
-      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-      ctx.lineTo(x + radius, y + height);
-      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-      ctx.lineTo(x, y + radius);
-      ctx.quadraticCurveTo(x, y, x + radius, y);
-      ctx.closePath();
-      if (fill) ctx.fill();
-      if (stroke) ctx.stroke();
-    }
-
-    // ==========================================
-    // TRANSMIT TO EMO ROBOT (MQTT)
-    // ==========================================
-    function sendImageToEmo() {
-      if (!loadedImage && canvasPlaceholder.offsetParent !== null) {
-        showFeedback('Please load or take a photo first!', false);
-        return;
-      }
-
-      const btn = document.getElementById('btnSendToEmo');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> TRANSMITTING...';
-
-      // 1. Get 320x320 high-quality compressed JPEG base64
-      const quality = 0.82;
-      const dataUrl = canvas.toDataURL('image/jpeg', quality);
-      const base64Data = dataUrl.split(',')[1];
-
-      let payload = "";
-      let topic = "display/image";
-
-      if (config.sendMode === 'mcp_preview') {
-        // Send MCP tool trigger format
-        topic = "control/screen";
-        payload = JSON.stringify({
-          type: "mcp",
-          tool: "self.screen.preview_image",
-          params: { data: base64Data, format: "jpeg", width: 320, height: 320 }
-        });
-      } else {
-        // Standard raw payload for EMO firmware subscriber
-        payload = JSON.stringify({
-          width: 320,
-          height: 320,
-          format: "jpeg",
-          data: base64Data
-        });
-      }
-
-      const success = publishMqtt(topic, payload);
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane text-black"></i> SEND TO EMO DISPLAY';
-        if (success) {
-          showFeedback('Photo sent! EMO display rendering in progress.', true);
-        }
-      }, 500);
-    }
-
-    function showFeedback(msg, isSuccess) {
-      const fb = document.getElementById('sendFeedback');
-      fb.classList.remove('hidden', 'bg-rose-500/10', 'text-rose-400', 'bg-cyber-neonGreen/10', 'text-cyber-neonGreen');
-      if (isSuccess) {
-        fb.classList.add('bg-cyber-neonGreen/10', 'text-cyber-neonGreen');
-        fb.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i> ${msg}`;
-      } else {
-        fb.classList.add('bg-rose-500/10', 'text-rose-400');
-        fb.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
-      }
-      setTimeout(() => { fb.classList.add('hidden'); }, 4000);
-    }
-
-    // ==========================================
-    // RELAY APPLIANCE CONTROL
-    // ==========================================
-    function toggleRelay(id) {
-      const newState = relayStates[id] === 1 ? 0 : 1;
-      const payload = JSON.stringify({ id: id, state: newState });
+    // Toggle Relay Logic
+    function toggleRelay(devId) {
+      const newState = relayStates[devId] === 1 ? 0 : 1;
+      AudioEngine.playClick(newState === 1);
       
-      // Publish to EMO hub relay command topic
-      const ok = publishMqtt('control/relay', payload);
-      if (ok) {
-        updateRelayUI(id, newState);
+      const payload = JSON.stringify({ id: devId, state: newState });
+      const topic = `${MQTT_CONFIG.topicBase}/control/relay`;
+
+      if (publishRaw(topic, payload)) {
+        updateCardUI(devId, newState);
+        logStream(`Dispatched: Relay ${devId} -> ${newState === 1 ? 'ON' : 'OFF'}`, 'cyan');
+      } else {
+        logStream(`Failed to send Relay ${devId} command (Offline)`, 'error');
       }
     }
 
     function setAllRelays(state) {
+      AudioEngine.playClick(state === 1);
       for (let i = 1; i <= 4; i++) {
         const payload = JSON.stringify({ id: i, state: state });
-        publishMqtt('control/relay', payload);
-        updateRelayUI(i, state);
+        publishRaw(`${MQTT_CONFIG.topicBase}/control/relay`, payload);
+        updateCardUI(i, state);
       }
+      logStream(`Master Command: Set all relays to ${state === 1 ? 'ON' : 'OFF'}`, 'warn');
     }
 
-    function updateRelayUI(id, state) {
-      relayStates[id] = state;
-      const btn = document.getElementById(`btnRelay${id}`);
-      const stText = document.getElementById(`relayStatus${id}`);
-      const thumb = btn.querySelector('span');
+    // UI Updates
+    function updateCardUI(devId, state) {
+      relayStates[devId] = state;
+
+      const card = document.getElementById(`card${devId}`);
+      const pill = document.getElementById(`pill${devId}`);
+      const btn = document.getElementById(`btnToggle${devId}`);
+      const thumb = document.getElementById(`thumb${devId}`);
+      const iconBox = document.getElementById(`iconBox${devId}`);
 
       if (state === 1) {
-        btn.classList.remove('bg-slate-700');
-        btn.classList.add('bg-cyber-neonGreen');
-        thumb.classList.remove('translate-x-0');
-        thumb.classList.add('translate-x-4');
-        stText.classList.remove('bg-slate-800', 'text-slate-400');
-        stText.classList.add('bg-cyber-neonGreen/20', 'text-cyber-neonGreen');
-        stText.innerText = 'ON';
-        if (id === 3) document.getElementById('fanIcon').classList.add('fa-spin');
+        // ON State Styling
+        card.classList.add('border-cyber-cyan/50', 'shadow-cardActive', 'bg-cyber-cardHover');
+        pill.className = 'text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-cyber-cyan/40 bg-cyber-cyan/20 text-cyber-cyan font-bold shadow-sm';
+        pill.innerText = 'ON';
+
+        btn.className = 'w-14 h-8 bg-cyber-cyan rounded-full transition-all duration-300 relative flex items-center p-1 cursor-pointer shadow-cyanGlow focus:outline-none';
+        thumb.className = 'w-6 h-6 rounded-full bg-cyber-black transition-transform duration-300 transform translate-x-6 shadow flex items-center justify-center';
+        thumb.innerHTML = '<span class="w-2 h-2 rounded-full bg-cyber-cyan"></span>';
+
+        iconBox.className = 'w-12 h-12 rounded-xl bg-cyber-cyan/15 border border-cyber-cyan/40 flex items-center justify-center text-cyber-cyan text-xl shadow-cyanGlow';
+
+        // Specific appliance active animations
+        if (devId === 3) document.getElementById('fanSpinner').classList.add('animate-fan');
+        if (devId === 4) document.getElementById('tvIcon').classList.add('tv-active');
+
       } else {
-        btn.classList.remove('bg-cyber-neonGreen');
-        btn.classList.add('bg-slate-700');
-        thumb.classList.remove('translate-x-4');
-        thumb.classList.add('translate-x-0');
-        stText.classList.remove('bg-cyber-neonGreen/20', 'text-cyber-neonGreen');
-        stText.classList.add('bg-slate-800', 'text-slate-400');
-        stText.innerText = 'OFF';
-        if (id === 3) document.getElementById('fanIcon').classList.remove('fa-spin');
+        // OFF State Styling
+        card.classList.remove('border-cyber-cyan/50', 'shadow-cardActive', 'bg-cyber-cardHover');
+        pill.className = 'text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-slate-700 bg-slate-800 text-slate-400 font-semibold';
+        pill.innerText = 'OFF';
+
+        btn.className = 'w-14 h-8 bg-slate-800 rounded-full transition-all duration-300 relative flex items-center p-1 cursor-pointer border border-slate-700 focus:outline-none';
+        thumb.className = 'w-6 h-6 rounded-full bg-slate-400 transition-transform duration-300 transform translate-x-0 shadow-sm flex items-center justify-center';
+        thumb.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>';
+
+        iconBox.className = 'w-12 h-12 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-center text-slate-500 text-xl';
+
+        if (devId === 3) document.getElementById('fanSpinner').classList.remove('animate-fan');
+        if (devId === 4) document.getElementById('tvIcon').classList.remove('tv-active');
       }
-    }
 
-    // ==========================================
-    // EMO EXPRESSIONS
-    // ==========================================
-    function sendEmotion(emotionName) {
-      // Send LLM emotion payload
-      const payload = JSON.stringify({
-        type: "llm",
-        emotion: emotionName
-      });
-      publishMqtt('control/emotion', payload);
-      appendLog(`Triggered expression: ${emotionName}`, 'cyan');
-    }
-
-    // ==========================================
-    // CAMERA ENGINE
-    // ==========================================
-    async function openCameraModal() {
-      const modal = document.getElementById('cameraModal');
-      const video = document.getElementById('cameraVideo');
-      modal.classList.remove('hidden');
-
-      try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' },
-          audio: false
-        });
-        video.srcObject = cameraStream;
-      } catch (err) {
-        appendLog('Camera access denied or error: ' + err.message, 'error');
-        alert('Could not access camera: ' + err.message);
-        closeCameraModal();
-      }
-    }
-
-    function closeCameraModal() {
-      const modal = document.getElementById('cameraModal');
-      modal.classList.add('hidden');
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        cameraStream = null;
-      }
-    }
-
-    function takeSnapshot() {
-      const video = document.getElementById('cameraVideo');
-      if (!video) return;
-
-      const tempCanvas = document.createElement('canvas');
-      const size = Math.min(video.videoWidth, video.videoHeight);
-      tempCanvas.width = 320;
-      tempCanvas.height = 320;
-      const tCtx = tempCanvas.getContext('2d');
-
-      const sx = (video.videoWidth - size) / 2;
-      const sy = (video.videoHeight - size) / 2;
-      tCtx.drawImage(video, sx, sy, size, size, 0, 0, 320, 320);
-
-      const snapImg = new Image();
-      snapImg.onload = function() {
-        loadedImage = snapImg;
-        canvasPlaceholder.classList.add('opacity-0');
-        setTimeout(() => canvasPlaceholder.classList.add('hidden'), 300);
-        redrawCanvas();
-        closeCameraModal();
-        appendLog('Camera snapshot captured (320x320).', 'success');
-      };
-      snapImg.src = tempCanvas.toDataURL('image/jpeg');
-    }
-
-    // ==========================================
-    // SETTINGS MODAL & RECONNECT
-    // ==========================================
-    function toggleMqttModal() {
-      const modal = document.getElementById('mqttModal');
-      modal.classList.toggle('hidden');
+      // Update Summary Counter
+      const activeCount = Object.values(relayStates).filter(v => v === 1).length;
+      document.getElementById('activeCount').innerText = `${activeCount} / 4 ACTIVE`;
     }
 
     function reconnectMqtt() {
-      config.host = document.getElementById('cfgBrokerHost').value.trim();
-      config.port = document.getElementById('cfgBrokerPort').value.trim();
-      config.path = document.getElementById('cfgBrokerPath').value.trim();
-      config.baseTopic = document.getElementById('cfgBaseTopic').value.trim();
-      config.sendMode = document.getElementById('cfgSendMode').value;
-
-      toggleMqttModal();
-
       if (mqttClient && mqttClient.isConnected()) {
         mqttClient.disconnect();
       }
-      initMQTT();
+      connectMQTT();
     }
 
-    // Auto initialize on load
+    // Auto-launch on load
     window.addEventListener('load', () => {
-      initMQTT();
-      // Render Initial EMO Robot Eye
-      loadPresetImage('robot');
+      connectMQTT();
     });
   </script>
 </body>
