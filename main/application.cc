@@ -468,9 +468,14 @@ void Application::Run() {
 void Application::HandleNetworkConnectedEvent() {
     ESP_LOGI(TAG, "Network connected");
 
-    // Wi-Fi aur ESP-NOW ko permanently Channel 11 par hardcode/lock kiya
-    esp_wifi_set_channel(11, WIFI_SECOND_CHAN_NONE);
-    ESP_LOGI(TAG, "Wi-Fi & ESP-NOW channel hardcoded to: 11");
+    // 1. Current Wi-Fi Channel fetch karo (jo Jio Router ne assign kiya hai)
+    uint8_t current_channel = 6;
+    wifi_second_chan_t second_chan;
+    if (esp_wifi_get_channel(&current_channel, &second_chan) == ESP_OK) {
+        ESP_LOGI(TAG, "Current Wi-Fi Channel detected: %d", current_channel);
+    } else {
+        current_channel = 6; // fallback
+    }
 
     esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (netif) {
@@ -486,7 +491,9 @@ void Application::HandleNetworkConnectedEvent() {
     }
 
     auto state = GetDeviceState();
-    InitEmoRelaySender();
+    
+    // 2. Sender init ko wahi channel do jo router ka hai
+    InitEmoRelaySender(); 
     StartWebMqttBridge();
     
     // ... baaki function ka code waisa hi rahega
