@@ -52,15 +52,15 @@ public:
 
             // Stage 1: 40 seconds idle -> funny / neutral
             if (idle_seconds_ >= 40 && idle_seconds_ < 90) {
-                display_->SetEmotion("Embarrassed"); // Lowercase "funny"
+                display_->SetEmotion("natural"); // Lowercase "funny"
             }
             // Stage 2: 90 seconds (1.5 min) idle -> sad
             else if (idle_seconds_ >= 90 && idle_seconds_ < 150) {
-                display_->SetEmotion("Confused");
+                display_->SetEmotion("natural");
             }
             // Stage 3: 150 seconds (2.5 min) idle -> sleepy
             else if (idle_seconds_ >= 150) {
-                display_->SetEmotion("Kiss");
+                display_->SetEmotion("natural");
             }
         }
     }
