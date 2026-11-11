@@ -154,7 +154,9 @@ void Application::Initialize() {
     display->SetupUI();
     RunEmoBootAnimation(display);
     EmoMoodEngine::GetInstance().Start(display);
-    StartEmoTouchService(display);
+    
+    // Pet detection disabled/commented out to prevent false touch triggers on GPIO 40
+    // StartEmoTouchService(display);
   
     // Setup the audio service
     auto codec = board.GetAudioCodec();
@@ -495,8 +497,6 @@ void Application::HandleNetworkConnectedEvent() {
     // 2. Sender init ko wahi channel do jo router ka hai
     InitEmoRelaySender(); 
     StartWebMqttBridge();
-    
-    // ... baaki function ka code waisa hi rahega
   
     if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring) {
         SetDeviceState(kDeviceStateActivating);
@@ -1050,7 +1050,10 @@ void Application::HandleWakeWordDetectedEvent() {
     auto state = GetDeviceState();
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
-    EmoMoodEngine::GetInstance().ResetInteraction("happy"); 
+    
+    // Hardcoded "happy" lock commented out; reset to "neutral" so Emo doesn't get stuck in happy mood
+    // EmoMoodEngine::GetInstance().ResetInteraction("happy");
+    EmoMoodEngine::GetInstance().ResetInteraction("neutral");
    
     if (state == kDeviceStateIdle) {
         BeginWakeWordInvoke(wake_word);
@@ -1376,7 +1379,7 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
     auto display = board.GetDisplay();
 
     std::string upgrade_url = url;
-    std::string version_info = version.empty() ? "(Manual upgrade)" : version;
+    std::version_info = version.empty() ? "(Manual upgrade)" : version;
 
     if (GetDeviceState() == kDeviceStateNotifying) {
         StopNotification();
