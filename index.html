@@ -3,473 +3,1079 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EMO // CORE DASHBOARD</title>
+    <title>EMO // EXECUTIVE MASTER CONTROL</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Paho MQTT Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         :root {
-            --bg-deep: #080a0f;
-            --panel: #111622;
-            --panel-active: #171f30;
-            --border-dim: #1d2536;
-            --border-highlight: rgba(0, 235, 255, 0.35);
-            --cyan-glow: #00ebff;
-            --amber-warm: #ffb300;
-            --text-title: #f1f5f9;
-            --text-sub: #7e8c9f;
+            --bg-void: #05070b;
+            --panel-base: #0e131d;
+            --panel-raised: #141b29;
+            --panel-active: #1e2638;
+            --border-dim: #1f2838;
+            --border-light: rgba(255, 255, 255, 0.08);
+            --border-accent: #00f0ff;
+            --cyan-glow: #00f0ff;
+            --cyan-soft: rgba(0, 240, 255, 0.2);
+            --amber-warm: #ffb700;
+            --amber-glow: rgba(255, 183, 0, 0.35);
+            --emerald: #00e676;
+            --rose: #ff2a55;
+            --text-head: #ffffff;
+            --text-main: #dbe4ef;
+            --text-muted: #6e8098;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
 
         body {
-            background-color: var(--bg-deep);
-            color: var(--text-title);
+            background-color: var(--bg-void);
+            color: var(--text-main);
             min-height: 100vh;
-            padding: 18px 16px;
+            padding: 16px 16px 36px;
             display: flex;
             flex-direction: column;
             gap: 16px;
-            max-width: 440px;
+            max-width: 480px;
             margin: 0 auto;
             position: relative;
-            transition: background 0.4s ease;
+            overflow-x: hidden;
+            transition: background 0.5s ease;
         }
 
-        body.room-lit {
-            background-color: #0b0d12;
-            background-image: radial-gradient(circle at 50% 20%, rgba(255, 179, 0, 0.12), transparent 70%);
+        body.room-illuminated {
+            background-image: 
+                radial-gradient(circle at 50% 12%, rgba(255, 183, 0, 0.16), transparent 60%),
+                radial-gradient(circle at 50% 88%, rgba(0, 240, 255, 0.06), transparent 50%);
         }
 
-        /* --- Header & Live Responsive EMO Eyes --- */
-        .hud-header {
-            background: var(--panel);
-            border: 1px solid var(--border-dim);
-            border-radius: 18px;
-            padding: 16px;
+        /* =======================================================
+           2-STAGE CINEMATIC INTRO OVERLAY
+        ======================================================= */
+        #intro-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #030508;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.7s;
+        }
+
+        #intro-overlay.vanished {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .intro-stage {
+            position: absolute;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+            text-align: center;
+            gap: 20px;
+            width: 90%;
+            max-width: 360px;
+            opacity: 0;
+            transform: scale(0.92) translateY(12px);
+            transition: all 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+            pointer-events: none;
         }
 
-        .hud-top-bar {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .intro-stage.active {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            pointer-events: auto;
         }
 
-        .hud-title {
-            font-size: 0.85rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-            color: var(--text-title);
+        .intro-stage.slide-out {
+            opacity: 0;
+            transform: scale(1.05) translateY(-20px);
         }
 
-        .status-pill {
-            font-size: 0.65rem;
-            font-weight: 600;
-            padding: 4px 10px;
-            border-radius: 12px;
-            background: #090c12;
-            border: 1px solid var(--border-dim);
-            color: var(--text-sub);
-            letter-spacing: 0.5px;
-        }
-
-        .status-pill.online {
-            border-color: rgba(0, 230, 118, 0.4);
-            color: #00e676;
-        }
-
-        /* EMO Interactive Screen */
-        .emo-display-box {
-            width: 140px;
-            height: 70px;
-            background: #020408;
-            border-radius: 16px;
-            border: 1px solid rgba(0, 235, 255, 0.25);
+        /* Pulse Core Ring for Stage 1 */
+        .cyber-orb {
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            border: 2px dashed var(--cyan-glow);
+            border-top-color: var(--amber-warm);
+            animation: orbSpin 2.5s linear infinite;
             display: flex;
             justify-content: center;
             align-items: center;
+            box-shadow: 0 0 28px rgba(0, 240, 255, 0.35);
+        }
+
+        .cyber-orb-inner {
+            width: 48px;
+            height: 48px;
+            background: rgba(0, 240, 255, 0.12);
+            border: 1.5px solid var(--cyan-glow);
+            border-radius: 50%;
+            animation: coreBreath 1.2s ease-in-out infinite alternate;
+        }
+
+        @keyframes orbSpin {
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes coreBreath {
+            0% { transform: scale(0.85); box-shadow: 0 0 8px var(--cyan-glow); }
+            100% { transform: scale(1.15); box-shadow: 0 0 22px var(--cyan-glow); }
+        }
+
+        .stage-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--text-head);
+            text-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
+        }
+
+        .stage-title span {
+            color: var(--cyan-glow);
+            text-shadow: 0 0 20px var(--cyan-glow);
+        }
+
+        .stage-subtitle {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            letter-spacing: 1.5px;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+        }
+
+        /* Radar Scanner for Stage 2 */
+        .scanner-disc {
+            width: 86px;
+            height: 86px;
+            border-radius: 50%;
+            border: 2px solid var(--amber-warm);
+            position: relative;
+            box-shadow: 0 0 24px rgba(255, 183, 0, 0.4);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .scanner-disc::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: conic-gradient(from 0deg, rgba(255, 183, 0, 0.45), transparent 60%);
+            animation: radarSweep 1.2s linear infinite;
+        }
+
+        .scanner-disc-center {
+            width: 14px;
+            height: 14px;
+            background: var(--amber-warm);
+            border-radius: 50%;
+            z-index: 2;
+            box-shadow: 0 0 12px var(--amber-warm);
+        }
+
+        @keyframes radarSweep {
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-bar-strip {
+            width: 240px;
+            height: 5px;
+            background: #111824;
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid var(--border-dim);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--cyan-glow), var(--amber-warm));
+            box-shadow: 0 0 12px var(--cyan-glow);
+            transition: width 0.1s linear;
+        }
+
+        /* =======================================================
+           HEADER & LIVE EMO DISPLAY
+        ======================================================= */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 2px;
+        }
+
+        .brand-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--cyan-glow), #0077ff);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 800;
+            font-size: 1rem;
+            color: #030508;
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+        }
+
+        .brand-text h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            color: var(--text-head);
+        }
+
+        .brand-text p {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .live-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--panel-base);
+            border: 1px solid var(--border-dim);
+            border-radius: 20px;
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .live-chip-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .live-chip.connected {
+            color: var(--emerald);
+            border-color: rgba(0, 230, 118, 0.35);
+        }
+        .live-chip.connected .live-chip-dot {
+            background: var(--emerald);
+            box-shadow: 0 0 8px var(--emerald);
+        }
+
+        .live-chip.disconnected {
+            color: var(--rose);
+            border-color: rgba(255, 42, 85, 0.35);
+        }
+        .live-chip.disconnected .live-chip-dot {
+            background: var(--rose);
+        }
+
+        /* --- Full Personality EMO Face Centerpiece --- */
+        .emo-console-card {
+            background: var(--panel-base);
+            border: 1px solid var(--border-light);
+            border-radius: 24px;
+            padding: 20px 18px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             gap: 14px;
-            box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 235, 255, 0.1);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+            position: relative;
         }
 
-        .emo-eye {
-            width: 38px;
-            height: 44px;
+        .emo-glass-bezel {
+            width: 100%;
+            max-width: 260px;
+            height: 98px;
+            background: #010306;
+            border-radius: 22px;
+            border: 1.5px solid rgba(0, 240, 255, 0.28);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.98), 0 0 24px rgba(0, 240, 255, 0.12);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .emo-eyes-wrap {
+            display: flex;
+            gap: 22px;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* 3D Bevelled Squircle Eyes */
+        .emo-eye-unit {
+            width: 58px;
+            height: 64px;
             background: var(--cyan-glow);
-            border-radius: 12px;
-            box-shadow: 0 0 14px var(--cyan-glow), inset -2px -2px 6px rgba(0, 150, 180, 0.8);
-            transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-            animation: emoBlink 4.5s infinite ease-in-out;
+            border-radius: 18px;
+            box-shadow: 
+                0 0 18px rgba(0, 240, 255, 0.8),
+                inset -3px -3px 8px rgba(0, 140, 180, 0.85),
+                inset 2px 2px 4px rgba(255, 255, 255, 0.4);
+            transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+            animation: naturalBreathingBlink 5s infinite ease-in-out;
         }
 
-        @keyframes emoBlink {
+        @keyframes naturalBreathingBlink {
             0%, 92%, 100% { transform: scaleY(1); }
             95% { transform: scaleY(0.08); }
         }
 
-        /* EMO Dynamic Reaction States */
-        .emo-display-box.react-wink #eye-right {
+        /* Real-Time Reactions on Tap */
+        .emo-glass-bezel.mood-happy .emo-eye-unit {
+            border-radius: 24px 24px 10px 10px;
+            transform: scaleY(0.7) translateY(-4px);
+        }
+
+        .emo-glass-bezel.mood-wink #eye-r {
             transform: scaleY(0.1);
         }
 
-        .emo-display-box.react-happy .emo-eye {
-            border-radius: 20px 20px 8px 8px;
-            transform: scaleY(0.65) translateY(-3px);
+        .emo-glass-bezel.mood-surprised .emo-eye-unit {
+            border-radius: 22px;
+            transform: scale(1.12);
         }
 
-        /* --- Section Label --- */
-        .section-tag {
-            font-size: 0.72rem;
-            font-weight: 700;
-            color: var(--text-sub);
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            padding: 0 4px;
+        .emo-telemetry-row {
             display: flex;
             justify-content: space-between;
+            width: 100%;
+            padding: 0 4px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        /* --- 2x2 Grid (Pehle Wale Size Me) --- */
-        .grid-2 {
+        .emo-telemetry-row b {
+            color: var(--cyan-glow);
+            font-weight: 600;
+        }
+
+        /* =======================================================
+           MASTER ACTION TOOLBAR
+        ======================================================= */
+        .master-toolbar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .master-action-btn {
+            background: var(--panel-raised);
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            color: var(--text-main);
+            cursor: pointer;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .master-action-btn:active {
+            transform: scale(0.96);
+            background: var(--panel-active);
+        }
+
+        .master-action-btn.btn-on:hover {
+            border-color: rgba(255, 183, 0, 0.5);
+            color: var(--amber-warm);
+        }
+
+        .master-action-btn.btn-off:hover {
+            border-color: rgba(255, 42, 85, 0.5);
+            color: var(--rose);
+        }
+
+        /* =======================================================
+           LARGE, BOLD, TACTILE APPLIANCE TILES
+        ======================================================= */
+        .section-headline {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px;
+        }
+
+        .section-headline h2 {
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .section-headline span {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--amber-warm);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tiles-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 14px;
         }
 
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--border-dim);
-            border-radius: 16px;
-            padding: 16px 14px;
+        /* Substantial Heavy 3D Card */
+        .appliance-tile {
+            background: var(--panel-raised);
+            border: 1.5px solid var(--border-light);
+            border-radius: 20px;
+            padding: 20px 16px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            gap: 16px;
+            height: 165px;
+            cursor: pointer;
             position: relative;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-            transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), 
-                        border-color 0.25s ease, 
-                        background 0.25s ease, 
-                        box-shadow 0.25s ease;
             overflow: hidden;
+            box-shadow: 
+                0 10px 24px rgba(0, 0, 0, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        /* Mechanical Button Tap Animation */
-        .card:active {
-            transform: scale(0.96) translateY(2px);
+        /* Satisfying Physical Spring Compression */
+        .appliance-tile:active {
+            transform: scale(0.95) translateY(4px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
         }
 
-        .card.active-state {
-            background: var(--panel-active);
-            border-color: rgba(255, 179, 0, 0.45);
-            box-shadow: 0 0 20px rgba(255, 179, 0, 0.22);
+        .appliance-tile.active {
+            background: #181d27;
+            border-color: rgba(255, 183, 0, 0.55);
+            box-shadow: 
+                0 14px 32px var(--amber-glow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                inset 0 0 20px rgba(255, 183, 0, 0.12);
         }
 
-        /* Ripple Flash Animation on Toggle */
-        .card.ripple-flash::after {
+        /* Shockwave Ripple on Toggle */
+        .appliance-tile.trigger-pulse::after {
             content: '';
             position: absolute;
             top: 50%; left: 50%;
-            width: 180%; height: 180%;
-            background: radial-gradient(circle, rgba(255, 179, 0, 0.25) 0%, transparent 60%);
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255, 183, 0, 0.35) 0%, transparent 60%);
             transform: translate(-50%, -50%) scale(0);
-            animation: rippleAnim 0.4s ease-out;
+            animation: pulseWave 0.45s ease-out;
             pointer-events: none;
         }
 
-        @keyframes rippleAnim {
+        @keyframes pulseWave {
             to { transform: translate(-50%, -50%) scale(1); opacity: 0; }
         }
 
-        .card-top {
+        .tile-head {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .tile-icon-box {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            justify-content: center;
             align-items: center;
+            color: var(--text-muted);
+            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        .card-icon {
-            font-size: 1.45rem;
-            transition: transform 0.25s ease;
+        .tile-icon-box svg {
+            width: 26px;
+            height: 26px;
+            fill: currentColor;
+            transition: transform 0.3s ease;
         }
 
-        .fan-rotate {
-            animation: spinFan 0.9s linear infinite;
+        .appliance-tile.active .tile-icon-box {
+            background: var(--amber-warm);
+            color: #06090e;
+            box-shadow: 0 0 18px rgba(255, 183, 0, 0.7);
         }
 
-        @keyframes spinFan {
+        /* Dedicated Spinning Aerodynamic Fan */
+        .appliance-tile.active #fan-icon svg {
+            animation: bladeRotate 0.75s linear infinite;
+        }
+
+        @keyframes bladeRotate {
             100% { transform: rotate(360deg); }
         }
 
-        .card-title {
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: var(--text-title);
-            letter-spacing: 0.2px;
-        }
-
-        .card-sub {
-            font-size: 0.65rem;
-            color: var(--text-sub);
-            margin-top: 2px;
-        }
-
-        /* --- Classic Toggle Switch --- */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 46px;
-            height: 24px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0; height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #0c1017;
-            border: 1px solid var(--border-dim);
+        /* Large Tactile Push Toggle Indicator */
+        .tactile-switch {
+            width: 50px;
+            height: 28px;
+            background: #090d14;
+            border: 1.5px solid var(--border-dim);
             border-radius: 20px;
-            transition: 0.25s;
+            position: relative;
+            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 16px;
-            width: 16px;
-            left: 3px;
-            bottom: 3px;
-            background-color: var(--text-sub);
+        .tactile-knob {
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
-            transition: 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+            background: var(--text-muted);
+            position: absolute;
+            top: 2.5px;
+            left: 3px;
+            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        input:checked + .slider {
-            background-color: rgba(255, 179, 0, 0.2);
+        .appliance-tile.active .tactile-switch {
+            background: rgba(255, 183, 0, 0.22);
             border-color: var(--amber-warm);
         }
 
-        input:checked + .slider:before {
+        .appliance-tile.active .tactile-knob {
             transform: translateX(22px);
-            background-color: var(--amber-warm);
-            box-shadow: 0 0 8px var(--amber-warm);
+            background: var(--amber-warm);
+            box-shadow: 0 0 10px var(--amber-warm);
         }
 
-        /* Clean Terminal Log */
-        .telemetry-box {
-            background: #06080c;
-            border: 1px solid var(--border-dim);
-            border-radius: 12px;
-            padding: 10px 14px;
-            font-size: 0.7rem;
-            color: var(--text-sub);
-            font-family: monospace;
+        .tile-foot {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .tile-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-head);
+            letter-spacing: -0.2px;
+        }
+
+        .tile-spec {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--text-muted);
             display: flex;
             justify-content: space-between;
         }
 
-        .telemetry-box b {
+        .tile-spec span.active-tag {
+            color: var(--amber-warm);
+            font-weight: 700;
+        }
+
+        /* =======================================================
+           COMPANION & TELEMETRY STRIP
+        ======================================================= */
+        .companion-bar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .companion-card {
+            background: var(--panel-base);
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+
+        .companion-card:active {
+            transform: scale(0.97);
+        }
+
+        .companion-card svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--cyan-glow);
+        }
+
+        .companion-info h3 {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-head);
+        }
+
+        .companion-info p {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .telemetry-strip {
+            background: #040609;
+            border: 1px solid var(--border-dim);
+            border-radius: 14px;
+            padding: 11px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .telemetry-strip b {
             color: var(--cyan-glow);
+        }
+
+        /* --- Made By Dheeraj Signature Footer --- */
+        .creator-signature {
+            text-align: center;
+            padding: 10px 0 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .creator-badge {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 2.2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            padding: 6px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-dim);
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .creator-badge span {
+            color: var(--amber-warm);
+            text-shadow: 0 0 10px rgba(255, 183, 0, 0.5);
+            font-weight: 800;
+        }
+
+        .creator-badge:hover {
+            border-color: rgba(255, 183, 0, 0.4);
+            box-shadow: 0 0 16px rgba(255, 183, 0, 0.25);
         }
     </style>
 </head>
 <body>
 
-    <!-- Top HUD with Interactive EMO Face -->
-    <div class="hud-header">
-        <div class="hud-top-bar">
-            <div class="hud-title">EMO RELAY HUB</div>
-            <div class="status-pill" id="net-badge">CONNECTING...</div>
-        </div>
-
-        <div class="emo-display-box" id="emo-screen">
-            <div class="emo-eye" id="eye-left"></div>
-            <div class="emo-eye" id="eye-right"></div>
-        </div>
-    </div>
-
-    <div class="section-tag">
-        <span>APPLIANCES</span>
-        <span>MQTT WIRELESS</span>
-    </div>
-
-    <!-- 2x2 Clean Grid -->
-    <div class="grid-2">
-        <!-- Light 1 -->
-        <div class="card" id="card-1">
-            <div class="card-top">
-                <span class="card-icon" id="icon-1">💡</span>
-                <label class="switch">
-                    <input type="checkbox" id="switch-1" onchange="sendRelay(1, this.checked)">
-                    <span class="slider"></span>
-                </label>
+    <!-- =======================================================
+         CINEMATIC 2-STAGE ANIMATED INTRO SEQUENCE
+    ======================================================= -->
+    <div id="intro-overlay">
+        <!-- Stage 1 -->
+        <div class="intro-stage active" id="stage-1">
+            <div class="cyber-orb">
+                <div class="cyber-orb-inner"></div>
             </div>
-            <div>
-                <div class="card-title">LIGHT 1</div>
-                <div class="card-sub">GPIO 18</div>
+            <div class="stage-title">HEY, <span>WELCOME</span></div>
+            <div class="stage-subtitle">// INITIALIZING EMO ROBOTICS LINK</div>
+            <div class="progress-bar-strip">
+                <div class="progress-bar-fill" id="stage1-fill"></div>
             </div>
         </div>
 
-        <!-- Light 2 -->
-        <div class="card" id="card-2">
-            <div class="card-top">
-                <span class="card-icon" id="icon-2">💡</span>
-                <label class="switch">
-                    <input type="checkbox" id="switch-2" onchange="sendRelay(2, this.checked)">
-                    <span class="slider"></span>
-                </label>
+        <!-- Stage 2 -->
+        <div class="intro-stage" id="stage-2">
+            <div class="scanner-disc">
+                <div class="scanner-disc-center"></div>
             </div>
-            <div>
-                <div class="card-title">LIGHT 2</div>
-                <div class="card-sub">GPIO 19</div>
-            </div>
-        </div>
-
-        <!-- Fan -->
-        <div class="card" id="card-3">
-            <div class="card-top">
-                <span class="card-icon" id="icon-3">🌀</span>
-                <label class="switch">
-                    <input type="checkbox" id="switch-3" onchange="sendRelay(3, this.checked)">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div>
-                <div class="card-title">COOLING FAN</div>
-                <div class="card-sub">GPIO 21</div>
-            </div>
-        </div>
-
-        <!-- TV -->
-        <div class="card" id="card-4">
-            <div class="card-top">
-                <span class="card-icon" id="icon-4">📺</span>
-                <label class="switch">
-                    <input type="checkbox" id="switch-4" onchange="sendRelay(4, this.checked)">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div>
-                <div class="card-title">TELEVISION</div>
-                <div class="card-sub">GPIO 22</div>
+            <div class="stage-title">EMO WEB <span>AUTOMATION</span></div>
+            <div class="stage-subtitle">CONTROL INTERFACE ACTIVE</div>
+            <div class="progress-bar-strip">
+                <div class="progress-bar-fill" id="stage2-fill"></div>
             </div>
         </div>
     </div>
 
-    <!-- Telemetry Bar -->
-    <div class="telemetry-box">
-        <span>CHANNEL: <b>ESP-NOW ACTIVE</b></span>
-        <span id="log-status">SYSTEM READY</span>
+    <!-- =======================================================
+         MAIN LUXURY MASTER CONTROL DASHBOARD
+    ======================================================= -->
+    <!-- Top Navigation -->
+    <div class="top-nav">
+        <div class="brand-meta">
+            <div class="brand-logo-icon">E</div>
+            <div class="brand-text">
+                <h1>EMO HOME AUTOMATION</h1>
+                <p>ESP32-S3 // ESP-NOW MESH</p>
+            </div>
+        </div>
+        <div class="live-chip" id="conn-chip">
+            <div class="live-chip-dot"></div>
+            <span id="conn-text">SYNCING</span>
+        </div>
+    </div>
+
+    <!-- Full Personality EMO Face Centerpiece -->
+    <div class="emo-console-card">
+        <div class="emo-glass-bezel" id="emo-face-bezel">
+            <div class="emo-eyes-wrap">
+                <div class="emo-eye-unit" id="eye-l"></div>
+                <div class="emo-eye-unit" id="eye-r"></div>
+            </div>
+        </div>
+        <div class="emo-telemetry-row">
+            <span>LINK: <b>EMQX CLOUD</b></span>
+            <span>RADIO: <b>ESP-NOW CH-06</b></span>
+            <span>PACKETS: <b id="packet-counter">0</b></span>
+        </div>
+    </div>
+
+    <!-- Master Control Bar -->
+    <div class="master-toolbar">
+        <div class="master-action-btn btn-on" onclick="masterControl(true)">
+            <span>⚡ ALL POWER ON</span>
+        </div>
+        <div class="master-action-btn btn-off" onclick="masterControl(false)">
+            <span>✕ KILL SWITCH (OFF)</span>
+        </div>
+    </div>
+
+    <!-- Appliance Tiles Header -->
+    <div class="section-headline">
+        <h2>Appliance Controls</h2>
+        <span id="active-summary">0 ACTIVE</span>
+    </div>
+
+    <!-- 4 Substantial Large Touch Tiles -->
+    <div class="tiles-grid">
+        <!-- Tile 1: Main Ceiling Light -->
+        <div class="appliance-tile" id="tile-1" onclick="toggleRelay(1)">
+            <div class="tile-head">
+                <div class="tile-icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+                </div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">Ceiling Light</div>
+                <div class="tile-spec">
+                    <span>GPIO 18</span>
+                    <span class="active-tag" id="status-1">STANDBY</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tile 2: Desk Reading Lamp -->
+        <div class="appliance-tile" id="tile-2" onclick="toggleRelay(2)">
+            <div class="tile-head">
+                <div class="tile-icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+                </div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">Reading Lamp</div>
+                <div class="tile-spec">
+                    <span>GPIO 19</span>
+                    <span class="active-tag" id="status-2">STANDBY</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tile 3: Room Fan -->
+        <div class="appliance-tile" id="tile-3" onclick="toggleRelay(3)">
+            <div class="tile-head">
+                <div class="tile-icon-box" id="fan-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 11a1 1 0 1 0 1 1 1 1 0 0 0-1-1m0-9a4 4 0 0 0-4 4c0 2.5 2 3.5 4 4.5 2-1 4-2 4-4.5a4 4 0 0 0-4-4m-9 9a4 4 0 0 0 4 4c2.5 0 3.5-2 4.5-4-1-2-2-4-4.5-4a4 4 0 0 0-4 4m9 9a4 4 0 0 0 4-4c0-2.5-2-3.5-4-4.5-2 1-4 2-4 4.5a4 4 0 0 0 4 4m9-9a4 4 0 0 0-4-4c-2.5 0-3.5 2-4.5 4 1 2 2 4 4.5 4a4 4 0 0 0 4-4"/></svg>
+                </div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">High-Vel Fan</div>
+                <div class="tile-spec">
+                    <span>GPIO 21</span>
+                    <span class="active-tag" id="status-3">STANDBY</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tile 4: Smart Television -->
+        <div class="appliance-tile" id="tile-4" onclick="toggleRelay(4)">
+            <div class="tile-head">
+                <div class="tile-icon-box">
+                    <svg viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2m0 14H3V5h18z"/></svg>
+                </div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">OLED Screen</div>
+                <div class="tile-spec">
+                    <span>GPIO 22</span>
+                    <span class="active-tag" id="status-4">STANDBY</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Companion Quick Actions -->
+    <div class="section-headline">
+        <h2>Companion Tools</h2>
+        <span>PHONE RELAY</span>
+    </div>
+
+    <div class="companion-bar">
+        <div class="companion-card" onclick="triggerPhoneCommand('torch')">
+            <svg viewBox="0 0 24 24"><path d="M7 2v3l2 3v14h6V8l2-3V2H7m3 2h4v1H10V4m1 14v-7h2v7h-2z"/></svg>
+            <div class="companion-info">
+                <h3>Phone Flash</h3>
+                <p>TOGGLE TORCH</p>
+            </div>
+        </div>
+        <div class="companion-card" onclick="triggerPhoneCommand('query')">
+            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m1 15h-2v-2h2zm1.07-7.75l-.9.92C12.45 10.9 12 11.5 12 13h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26A2 2 0 1 0 9 6.5H7a4 4 0 1 1 8 0 3 3 0 0 1-.93 2.25z"/></svg>
+            <div class="companion-info">
+                <h3>Cloud Query</h3>
+                <p>ASK ASSISTANT</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Telemetry Monitor -->
+    <div class="telemetry-strip">
+        <span>BROKER: <b>EMQX.IO [TLS 8084]</b></span>
+        <span id="log-monitor">ACTIVE & READY</span>
+    </div>
+
+    <!-- Signature Footer Credit -->
+    <div class="creator-signature">
+        <div class="creator-badge">
+            ⚡ DESIGNED & BUILT • <span>MADE BY DHEERAJ</span>
+        </div>
     </div>
 
     <script>
+        // =======================================================
+        // 1. TWO-STAGE CINEMATIC INTRO PIPELINE
+        // =======================================================
+        function runIntroSequence() {
+            const stage1 = document.getElementById('stage-1');
+            const stage2 = document.getElementById('stage-2');
+            const stage1Fill = document.getElementById('stage1-fill');
+            const stage2Fill = document.getElementById('stage2-fill');
+            const overlay = document.getElementById('intro-overlay');
+
+            // Stage 1 Progress (1.4s)
+            let p1 = 0;
+            const timer1 = setInterval(() => {
+                p1 += 5;
+                stage1Fill.style.width = p1 + '%';
+                if (p1 >= 100) {
+                    clearInterval(timer1);
+
+                    // Slide Stage 1 out & Stage 2 in
+                    stage1.classList.remove('active');
+                    stage1.classList.add('slide-out');
+                    setTimeout(() => {
+                        stage2.classList.add('active');
+
+                        // Stage 2 Progress (1.5s)
+                        let p2 = 0;
+                        const timer2 = setInterval(() => {
+                            p2 += 4;
+                            stage2Fill.style.width = p2 + '%';
+                            if (p2 >= 100) {
+                                clearInterval(timer2);
+
+                                // Fluid fade directly into dashboard
+                                setTimeout(() => {
+                                    overlay.classList.add('vanished');
+                                    triggerEmoReaction('happy');
+                                }, 350);
+                            }
+                        }, 35);
+                    }, 400);
+                }
+            }, 45);
+        }
+
+        window.addEventListener('DOMContentLoaded', runIntroSequence);
+
+        // =======================================================
+        // 2. MQTT LIVE PIPELINE & STATE ENGINE
+        // =======================================================
         const MQTT_BROKER = "broker.emqx.io";
         const MQTT_PORT = 8084;
         const TOPIC_RELAY = "dheeraj_emo_hub_9921/control/relay";
         const TOPIC_STATUS_WILDCARD = "dheeraj_emo_hub_9921/status/#";
-        const CLIENT_ID = "emo_web_core_" + Math.random().toString(16).substr(2, 8);
+        const CLIENT_ID = "emo_exec_pad_" + Math.random().toString(16).substr(2, 8);
 
+        const states = { 1: false, 2: false, 3: false, 4: false };
         let mqttConnected = false;
+        let packetCount = 0;
         const mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), CLIENT_ID);
 
         function triggerHaptic() {
-            if ("vibrate" in navigator) navigator.vibrate(22);
+            if ("vibrate" in navigator) {
+                navigator.vibrate(24);
+            }
         }
 
-        // Button dabane par EMO Face ka reaction
-        function triggerEmoReaction(isOn) {
-            const screen = document.getElementById("emo-screen");
-            const reactionClass = isOn ? "react-happy" : "react-wink";
-            screen.classList.add(reactionClass);
-
+        // Live Dynamic Reaction of EMO Eyes
+        function triggerEmoReaction(type) {
+            const bezel = document.getElementById('emo-face-bezel');
+            bezel.className = 'emo-glass-bezel mood-' + type;
             setTimeout(() => {
-                screen.classList.remove(reactionClass);
-            }, 550);
+                bezel.className = 'emo-glass-bezel';
+            }, 750);
         }
 
-        function updateVisualState(id, state) {
-            const card = document.getElementById(`card-${id}`);
-            const icon = document.getElementById(`icon-${id}`);
-            if (!card || !icon) return;
+        function setLog(text) {
+            document.getElementById('log-monitor').innerText = text;
+        }
 
-            // Trigger ripple effect
-            card.classList.remove("ripple-flash");
-            void card.offsetWidth;
-            card.classList.add("ripple-flash");
+        function updateCardUI(id, state) {
+            states[id] = state;
+            const tile = document.getElementById(`tile-${id}`);
+            const statusLabel = document.getElementById(`status-${id}`);
+
+            // Shockwave Ripple
+            tile.classList.remove('trigger-pulse');
+            void tile.offsetWidth;
+            tile.classList.add('trigger-pulse');
 
             if (state) {
-                card.classList.add('active-state');
-                if (id === 3) icon.classList.add('fan-rotate');
+                tile.classList.add('active');
+                statusLabel.innerText = "ONLINE";
             } else {
-                card.classList.remove('active-state');
-                if (id === 3) icon.classList.remove('fan-rotate');
+                tile.classList.remove('active');
+                statusLabel.innerText = "STANDBY";
             }
 
-            // Room ambient glow check
-            const l1 = document.getElementById('switch-1').checked;
-            const l2 = document.getElementById('switch-2').checked;
-            if (l1 || l2) {
-                document.body.classList.add('room-lit');
+            // Summary calculation
+            const activeCount = Object.values(states).filter(Boolean).length;
+            document.getElementById('active-summary').innerText = `${activeCount} ACTIVE`;
+
+            // Ambient background illumination
+            if (states[1] || states[2]) {
+                document.body.classList.add('room-illuminated');
             } else {
-                document.body.classList.remove('room-lit');
+                document.body.classList.remove('room-illuminated');
             }
         }
 
-        function sendRelay(id, state) {
+        function toggleRelay(id) {
             triggerHaptic();
-            triggerEmoReaction(state);
-            updateVisualState(id, state);
+            const nextState = !states[id];
+            
+            // Random cute reaction
+            const mood = nextState ? 'happy' : (Math.random() > 0.5 ? 'wink' : 'surprised');
+            triggerEmoReaction(mood);
+            updateCardUI(id, nextState);
 
             if (mqttConnected) {
-                const payload = JSON.stringify({ id: Number(id), state: state ? 1 : 0 });
+                const payload = JSON.stringify({ id: Number(id), state: nextState ? 1 : 0 });
                 const message = new Paho.MQTT.Message(payload);
                 message.destinationName = TOPIC_RELAY;
                 message.qos = 1;
                 mqttClient.send(message);
-                document.getElementById("log-status").innerText = `SENT DEV ${id} -> ${state ? 'ON' : 'OFF'}`;
+                packetCount++;
+                document.getElementById('packet-counter').innerText = packetCount;
+                setLog(`DISPATCH CH-0${id} -> ${nextState ? 'ENGAGED' : 'IDLE'}`);
             }
         }
 
-        // Live Retained Sync from ESP32
+        function masterControl(turnOn) {
+            triggerHaptic();
+            triggerEmoReaction(turnOn ? 'happy' : 'surprised');
+            for (let i = 1; i <= 4; i++) {
+                if (states[i] !== turnOn) {
+                    toggleRelay(i);
+                }
+            }
+        }
+
+        function triggerPhoneCommand(action) {
+            triggerHaptic();
+            triggerEmoReaction('wink');
+            if (mqttConnected) {
+                const payload = JSON.stringify({ type: "phone_action", cmd: action });
+                const message = new Paho.MQTT.Message(payload);
+                message.destinationName = "dheeraj_emo_hub_9921/control/media";
+                message.qos = 1;
+                mqttClient.send(message);
+                setLog(`PHONE ACTION -> ${action.toUpperCase()} DISPATCHED`);
+            }
+        }
+
+        // Live Retained Status Messages from ESP32-S3
         mqttClient.onMessageArrived = function (message) {
             try {
                 const data = JSON.parse(message.payloadString);
                 const id = Number(data.id);
                 const state = (Number(data.state) === 1);
-
-                const sw = document.getElementById(`switch-${id}`);
-                if (sw && sw.checked !== state) {
-                    sw.checked = state;
-                    updateVisualState(id, state);
-                }
-                document.getElementById("log-status").innerText = `SYNC DEV ${id}: ${state ? 'ON' : 'OFF'}`;
-            } catch (e) {}
+                updateCardUI(id, state);
+                packetCount++;
+                document.getElementById('packet-counter').innerText = packetCount;
+                setLog(`SYNC DEV 0${id} [${state ? 'ON' : 'OFF'}]`);
+            } catch (e) {
+                console.error("Payload parse error", e);
+            }
         };
 
         mqttClient.onConnectionLost = function () {
             mqttConnected = false;
-            const badge = document.getElementById("net-badge");
-            badge.innerText = "OFFLINE";
-            badge.className = "status-pill";
-            setTimeout(connectBroker, 3000);
+            const chip = document.getElementById('conn-chip');
+            const text = document.getElementById('conn-text');
+            chip.className = 'live-chip disconnected';
+            text.innerText = "OFFLINE";
+            setLog("Link lost. Retrying in 3 seconds...");
+            setTimeout(connectMQTT, 3000);
         };
 
-        function connectBroker() {
+        function connectMQTT() {
             mqttClient.connect({
                 useSSL: true,
                 timeout: 5,
@@ -477,19 +1083,25 @@
                 cleanSession: false,
                 onSuccess: function () {
                     mqttConnected = true;
-                    const badge = document.getElementById("net-badge");
-                    badge.innerText = "ONLINE";
-                    badge.className = "status-pill online";
+                    const chip = document.getElementById('conn-chip');
+                    const text = document.getElementById('conn-text');
+                    chip.className = 'live-chip connected';
+                    text.innerText = "CONNECTED";
+                    setLog("EMQX Cloud Linked! Instant Relay Active.");
                     mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 1 });
                 },
                 onFailure: function () {
                     mqttConnected = false;
-                    setTimeout(connectBroker, 5000);
+                    const chip = document.getElementById('conn-chip');
+                    const text = document.getElementById('conn-text');
+                    chip.className = 'live-chip disconnected';
+                    text.innerText = "RETRYING";
+                    setTimeout(connectMQTT, 5000);
                 }
             });
         }
 
-        connectBroker();
+        connectMQTT();
     </script>
 </body>
 </html>
