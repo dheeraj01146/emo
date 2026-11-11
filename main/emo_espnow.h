@@ -32,35 +32,57 @@ inline void InitEmoRelaySender() {
         return;
     }
 
+    // Dynamic Wi-Fi Channel read karo jo Router ne EMO ko diya hai
+    uint8_t current_channel = 0;
+    wifi_second_chan_t second_chan;
+    if (esp_wifi_get_channel(&current_channel, &second_chan) != ESP_OK || current_channel == 0) {
+        current_channel = 6; // Safe default
+    }
+
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, RELAY_BOARD_MAC, 6);
-    peer.channel = 11; // Hardcoded Channel 11 (Matching Jio Home Router)
+    peer.channel = current_channel; // <-- Ab Router ke channel se 100% match hoga!
     peer.ifidx = WIFI_IF_STA;
     peer.encrypt = false;
 
-    // Pehle purana peer clean karo agar ho toh
+    // Purana peer clean karo agar pehle se registered ho
     if (esp_now_is_peer_exist(RELAY_BOARD_MAC)) {
         esp_now_del_peer(RELAY_BOARD_MAC);
     }
 
     if (esp_now_add_peer(&peer) == ESP_OK) {
-        ESP_LOGI(RELAY_TAG, "Relay Board Paired on Fixed Channel 11: 68:09:47:86:26:A0");
+        ESP_LOGI(RELAY_TAG, "Relay Board Paired dynamically on active Channel %d: 68:09:47:86:26:A0", current_channel);
     } else {
-        ESP_LOGE(RELAY_TAG, "Failed to add Relay Board peer");
+        ESP_LOGE(RELAY_TAG, "Failed to add Relay Board peer on Channel %d", current_channel);
     }
 }
 
 inline void SendRelayControl(uint8_t device_num, uint8_t state) {
+    // Current channel check karke peer ko sync mein rakho
+    uint8_t current_channel = 0;
+    wifi_second_chan_t second_chan;
+    esp_wifi_get_channel(&current_channel, &second_chan);
+
     if (!esp_now_is_peer_exist(RELAY_BOARD_MAC)) {
         InitEmoRelaySender();
+    } else {
+        // Agar router ne channel beech me badal diya ho, toh peer channel update karo
+        esp_now_peer_info_t existing_peer = {};
+        if (esp_now_get_peer(RELAY_BOARD_MAC, &existing_peer) == ESP_OK) {
+            if (existing_peer.channel != current_channel && current_channel != 0) {
+                existing_peer.channel = current_channel;
+                esp_now_mod_peer(&existing_peer);
+                ESP_LOGI(RELAY_TAG, "Updated Peer Channel to match Wi-Fi: %d", current_channel);
+            }
+        }
     }
 
     RelayCommand cmd = {device_num, state};
     esp_err_t result = esp_now_send(RELAY_BOARD_MAC, (const uint8_t*)&cmd, sizeof(RelayCommand));
     if (result == ESP_OK) {
-        ESP_LOGI(RELAY_TAG, "Command Sent -> Device: %d, State: %d (Fixed Ch 11)", device_num, state);
+        ESP_LOGI(RELAY_TAG, "Command Sent -> Device: %d, State: %d (Active Ch %d)", device_num, state, current_channel);
     } else {
-        ESP_LOGE(RELAY_TAG, "Failed to send command: %d", result);
+        ESP_LOGE(RELAY_TAG, "Failed to send command: %d on Ch %d", result, current_channel);
     }
 }
 #else
