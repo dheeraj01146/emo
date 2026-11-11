@@ -3,454 +3,422 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EMO // NEXUS HOME OS</title>
-    <!-- Fonts -->
+    <title>EMO // CLASSIC SUITE</title>
+    <!-- Premium Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <!-- Paho MQTT Library -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <!-- Paho MQTT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         :root {
-            --bg-deep: #07090e;
-            --surface: rgba(18, 24, 38, 0.65);
-            --surface-hover: rgba(28, 38, 60, 0.75);
-            --surface-border: rgba(255, 255, 255, 0.08);
-            --cyan-glow: #00f0ff;
-            --amber-active: #ffb300;
-            --amber-glow: rgba(255, 179, 0, 0.35);
-            --emerald-online: #00e676;
-            --rose-offline: #ff1744;
-            --text-primary: #f0f4f8;
-            --text-secondary: #8292a2;
-            --card-radius: 20px;
+            --bg: #0b0e14;
+            --surface: #121722;
+            --surface-card: #161d2b;
+            --surface-hover: #1c2536;
+            --border: #222c3d;
+            --border-active: #d4af37;
+            --gold: #e5b842;
+            --gold-glow: rgba(229, 184, 66, 0.25);
+            --cyan: #00e5ff;
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+            --text-sub: #94a3b8;
+            --green: #10b981;
+            --red: #ef4444;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', -apple-system, sans-serif;
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
 
         body {
-            background-color: var(--bg-deep);
-            background-image: 
-                radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08), transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(255, 179, 0, 0.04), transparent 50%);
-            color: var(--text-primary);
+            background-color: var(--bg);
+            color: var(--text-main);
             min-height: 100vh;
-            padding: 20px 18px 40px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 22px;
-            max-width: 480px;
+            gap: 14px;
+            max-width: 440px;
             margin: 0 auto;
-            position: relative;
-            overflow-x: hidden;
-            transition: background 0.6s ease;
         }
 
-        body.ambient-lit {
-            background-image: 
-                radial-gradient(circle at 50% 15%, rgba(255, 179, 0, 0.18), transparent 60%),
-                radial-gradient(circle at 50% 85%, rgba(0, 240, 255, 0.06), transparent 50%);
-        }
-
-        /* --- Ambient Header --- */
-        .top-bar {
+        /* --- Header with Mini EMO Screen --- */
+        .header-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 6px 4px;
         }
 
-        .brand-title {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.35rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
+        .brand-cluster {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
         }
 
-        .brand-title span {
-            color: var(--cyan-glow);
-            text-shadow: 0 0 16px rgba(0, 240, 255, 0.6);
+        /* Mini Compact EMO Display */
+        .mini-emo-screen {
+            width: 58px;
+            height: 38px;
+            background: #020408;
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            border-radius: 9px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 229, 255, 0.15);
         }
 
-        .status-pill {
+        .emo-mini-eye {
+            width: 15px;
+            height: 18px;
+            background: var(--cyan);
+            border-radius: 5px;
+            box-shadow: 0 0 6px var(--cyan);
+            animation: miniBlink 4s infinite ease-in-out;
+        }
+
+        @keyframes miniBlink {
+            0%, 92%, 100% { transform: scaleY(1); }
+            95% { transform: scaleY(0.1); }
+        }
+
+        .title-meta h1 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            color: var(--text-main);
+        }
+
+        .title-meta p {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .net-badge {
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--surface-border);
-            padding: 6px 12px;
-            border-radius: 30px;
-            font-size: 0.72rem;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            backdrop-filter: blur(12px);
-            transition: all 0.3s ease;
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--text-secondary);
-            box-shadow: 0 0 8px currentColor;
-        }
-
-        .status-pill.online {
-            border-color: rgba(0, 230, 118, 0.3);
-            color: var(--emerald-online);
-        }
-        .status-pill.online .status-dot {
-            background: var(--emerald-online);
-        }
-
-        .status-pill.offline {
-            border-color: rgba(255, 23, 68, 0.3);
-            color: var(--rose-offline);
-        }
-        .status-pill.offline .status-dot {
-            background: var(--rose-offline);
-        }
-
-        /* --- Living EMO Glass Hub --- */
-        .emo-hub-card {
-            background: var(--surface);
-            border: 1px solid var(--surface-border);
-            border-radius: 26px;
-            padding: 22px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 16px;
-            position: relative;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-        }
-
-        .emo-display-frame {
-            width: 170px;
-            height: 82px;
-            background: #020408;
+            gap: 6px;
+            padding: 5px 10px;
+            background: #0a111a;
+            border: 1px solid var(--border);
             border-radius: 20px;
-            border: 1px solid rgba(0, 240, 255, 0.25);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.9), 0 0 24px rgba(0, 240, 255, 0.15);
-        }
-
-        .emo-screen-canvas {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-        }
-
-        .squircle-eye {
-            width: 48px;
-            height: 52px;
-            background: var(--cyan-glow);
-            border-radius: 15px;
-            box-shadow: 0 0 18px rgba(0, 240, 255, 0.8), inset -2px -2px 6px rgba(0, 150, 200, 0.8);
-            animation: naturalBlink 4.5s infinite ease-in-out;
-            transition: transform 0.2s ease;
-        }
-
-        @keyframes naturalBlink {
-            0%, 92%, 100% { transform: scaleY(1); }
-            95% { transform: scaleY(0.06); }
-        }
-
-        .hub-telemetry {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-            padding: 0 4px;
-            font-size: 0.72rem;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        .hub-telemetry b {
-            color: var(--cyan-glow);
-            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
             font-weight: 600;
+            color: var(--text-muted);
         }
 
-        /* --- Section Label --- */
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 4px;
+        .net-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
         }
 
-        .section-header h2 {
-            font-size: 0.82rem;
-            font-weight: 700;
-            letter-spacing: 1.2px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
+        .net-badge.online {
+            color: var(--green);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+        .net-badge.online .net-dot {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
         }
 
-        .section-header span {
-            font-size: 0.7rem;
-            color: var(--cyan-glow);
-            font-weight: 600;
+        .net-badge.offline {
+            color: var(--red);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        .net-badge.offline .net-dot {
+            background: var(--red);
         }
 
-        /* --- HomeKit Style Interactive Grid --- */
-        .device-grid {
+        /* --- Master Bar (Solid Utility) --- */
+        .master-bar {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 14px;
+            gap: 10px;
         }
 
-        .tile {
+        .master-btn {
             background: var(--surface);
-            border: 1px solid var(--surface-border);
-            border-radius: var(--card-radius);
-            padding: 18px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .master-btn:active {
+            background: var(--surface-hover);
+            transform: scale(0.98);
+        }
+
+        /* --- Device List (Balanced & Filled) --- */
+        .section-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            padding: 0 2px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .device-stack {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            height: 148px;
-            cursor: pointer;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            transition: all 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            gap: 10px;
         }
 
-        .tile:active {
-            transform: scale(0.97);
-        }
-
-        .tile::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.12), transparent 70%);
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-
-        .tile.active {
-            background: rgba(36, 30, 16, 0.8);
-            border-color: rgba(255, 179, 0, 0.45);
-            box-shadow: 0 14px 30px var(--amber-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-        }
-
-        .tile.active::after {
-            opacity: 1;
-        }
-
-        .tile-top {
+        .device-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
+            transition: all 0.25s ease;
+            cursor: pointer;
         }
 
-        .icon-circle {
-            width: 44px;
-            height: 44px;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+        .device-card:active {
+            transform: scale(0.985);
+        }
+
+        .device-card.active {
+            background: #19202e;
+            border-color: var(--border-active);
+            box-shadow: 0 4px 16px var(--gold-glow);
+        }
+
+        .device-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .device-icon-box {
+            width: 36px;
+            height: 36px;
+            border-radius: 9px;
+            background: var(--surface);
+            border: 1px solid var(--border);
             display: flex;
             justify-content: center;
             align-items: center;
-            color: var(--text-secondary);
-            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            color: var(--text-muted);
+            transition: all 0.25s;
         }
 
-        .icon-circle svg {
-            width: 22px;
-            height: 22px;
+        .device-icon-box svg {
+            width: 18px;
+            height: 18px;
             fill: currentColor;
-            transition: transform 0.3s ease;
         }
 
-        .tile.active .icon-circle {
-            background: var(--amber-active);
-            color: #0d0e12;
-            box-shadow: 0 0 16px rgba(255, 179, 0, 0.6);
+        .device-card.active .device-icon-box {
+            background: var(--gold);
+            color: #0b0e14;
+            border-color: var(--gold);
+            box-shadow: 0 0 10px rgba(229, 184, 66, 0.4);
         }
 
-        /* Fan spin when active */
-        .tile.active #fan-icon svg {
-            animation: spinFast 0.85s linear infinite;
+        /* Fan Spin */
+        .device-card.active #fan-icon svg {
+            animation: spin 0.8s linear infinite;
         }
 
-        @keyframes spinFast {
+        @keyframes spin {
             100% { transform: rotate(360deg); }
         }
 
-        .state-chip {
-            font-size: 0.68rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-        }
-
-        .tile.active .state-chip {
-            color: var(--amber-active);
-        }
-
-        .tile-bottom {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .device-name {
-            font-size: 0.95rem;
+        .device-info h2 {
+            font-size: 0.86rem;
             font-weight: 600;
-            color: var(--text-primary);
-            letter-spacing: -0.2px;
+            color: var(--text-main);
+            line-height: 1.2;
         }
 
-        .device-sub {
-            font-size: 0.72rem;
-            color: var(--text-secondary);
+        .device-info p {
+            font-size: 0.66rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
         }
 
-        /* --- Minimal Terminal Log --- */
-        .live-log-card {
-            background: rgba(8, 11, 16, 0.7);
-            border: 1px solid var(--surface-border);
-            border-radius: 16px;
-            padding: 12px 14px;
+        /* Modern Compact Pill Switch */
+        .pill-switch {
+            width: 44px;
+            height: 24px;
+            background: #0d121c;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            position: relative;
+            transition: all 0.25s;
+        }
+
+        .pill-knob {
+            width: 18px;
+            height: 18px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .device-card.active .pill-switch {
+            background: rgba(229, 184, 66, 0.2);
+            border-color: var(--gold);
+        }
+
+        .device-card.active .pill-knob {
+            transform: translateX(20px);
+            background: var(--gold);
+            box-shadow: 0 0 8px var(--gold);
+        }
+
+        /* --- Footer Status Strip --- */
+        .status-strip {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 9px 12px;
             display: flex;
-            flex-direction: column;
-            gap: 6px;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        .log-title {
-            font-size: 0.65rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-        }
-
-        .log-text {
-            font-family: 'Space Grotesk', monospace;
-            font-size: 0.72rem;
-            color: var(--cyan-glow);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .status-strip b {
+            color: var(--cyan);
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
 
-    <!-- Header Navigation -->
-    <div class="top-bar">
-        <div class="brand-title">EMO <span>NEXUS</span></div>
-        <div class="status-pill" id="net-status">
-            <div class="status-dot"></div>
-            <span id="net-label">CONNECTING</span>
-        </div>
-    </div>
-
-    <!-- Living Expression Screen -->
-    <div class="emo-hub-card">
-        <div class="emo-display-frame">
-            <div class="emo-screen-canvas">
-                <div class="squircle-eye" id="eye-left"></div>
-                <div class="squircle-eye" id="eye-right"></div>
+    <!-- Header Bar -->
+    <div class="header-bar">
+        <div class="brand-cluster">
+            <div class="mini-emo-screen">
+                <div class="emo-mini-eye"></div>
+                <div class="emo-mini-eye"></div>
+            </div>
+            <div class="title-meta">
+                <h1>EMO Hub Executive</h1>
+                <p>ESP32-S3 // ESP-NOW MESH</p>
             </div>
         </div>
-        <div class="hub-telemetry">
-            <span>LINK: <b>EMQX CLOUD</b></span>
-            <span>RADIO: <b>ESP-NOW FAST</b></span>
-            <span>LATENCY: <b>&lt; 20ms</b></span>
+        <div class="net-badge" id="net-badge">
+            <div class="net-dot"></div>
+            <span id="net-text">CONNECTING</span>
         </div>
     </div>
 
-    <!-- Controls Grid -->
-    <div class="section-header">
-        <h2>Appliance Relays</h2>
-        <span>4 CHANNELS ACTIVE</span>
+    <!-- Quick Utilities -->
+    <div class="master-bar">
+        <div class="master-btn" onclick="masterControl(true)">
+            <span>⚡ ALL ON</span>
+        </div>
+        <div class="master-btn" onclick="masterControl(false)">
+            <span>✕ ALL OFF</span>
+        </div>
     </div>
 
-    <div class="device-grid">
+    <!-- Relays List -->
+    <div class="section-label">
+        <span>Relay Modules</span>
+        <span id="active-count">0 Active</span>
+    </div>
+
+    <div class="device-stack">
         <!-- Light 1 -->
-        <div class="tile" id="tile-1" onclick="toggleDevice(1)">
-            <div class="tile-top">
-                <div class="icon-circle">
+        <div class="device-card" id="card-1" onclick="toggleDevice(1)">
+            <div class="device-left">
+                <div class="device-icon-box">
                     <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
                 </div>
-                <div class="state-chip" id="chip-1">OFF</div>
+                <div class="device-info">
+                    <h2>Ceiling Light</h2>
+                    <p>GPIO 18 • RELAY 01</p>
+                </div>
             </div>
-            <div class="tile-bottom">
-                <div class="device-name">Ceiling Light</div>
-                <div class="device-sub">Channel 01</div>
-            </div>
+            <div class="pill-switch"><div class="pill-knob"></div></div>
         </div>
 
         <!-- Light 2 -->
-        <div class="tile" id="tile-2" onclick="toggleDevice(2)">
-            <div class="tile-top">
-                <div class="icon-circle">
+        <div class="device-card" id="card-2" onclick="toggleDevice(2)">
+            <div class="device-left">
+                <div class="device-icon-box">
                     <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
                 </div>
-                <div class="state-chip" id="chip-2">OFF</div>
+                <div class="device-info">
+                    <h2>Desk Lamp</h2>
+                    <p>GPIO 19 • RELAY 02</p>
+                </div>
             </div>
-            <div class="tile-bottom">
-                <div class="device-name">Lamp Light</div>
-                <div class="device-sub">Channel 02</div>
-            </div>
+            <div class="pill-switch"><div class="pill-knob"></div></div>
         </div>
 
         <!-- Fan -->
-        <div class="tile" id="tile-3" onclick="toggleDevice(3)">
-            <div class="tile-top">
-                <div class="icon-circle" id="fan-icon">
+        <div class="device-card" id="card-3" onclick="toggleDevice(3)">
+            <div class="device-left">
+                <div class="device-icon-box" id="fan-icon">
                     <svg viewBox="0 0 24 24"><path d="M12 11a1 1 0 1 0 1 1 1 1 0 0 0-1-1m0-9a4 4 0 0 0-4 4c0 2.5 2 3.5 4 4.5 2-1 4-2 4-4.5a4 4 0 0 0-4-4m-9 9a4 4 0 0 0 4 4c2.5 0 3.5-2 4.5-4-1-2-2-4-4.5-4a4 4 0 0 0-4 4m9 9a4 4 0 0 0 4-4c0-2.5-2-3.5-4-4.5-2 1-4 2-4 4.5a4 4 0 0 0 4 4m9-9a4 4 0 0 0-4-4c-2.5 0-3.5 2-4.5 4 1 2 2 4 4.5 4a4 4 0 0 0 4-4"/></svg>
                 </div>
-                <div class="state-chip" id="chip-3">OFF</div>
+                <div class="device-info">
+                    <h2>Cooling Fan</h2>
+                    <p>GPIO 21 • RELAY 03</p>
+                </div>
             </div>
-            <div class="tile-bottom">
-                <div class="device-name">Cooling Fan</div>
-                <div class="device-sub">Channel 03</div>
-            </div>
+            <div class="pill-switch"><div class="pill-knob"></div></div>
         </div>
 
         <!-- TV -->
-        <div class="tile" id="tile-4" onclick="toggleDevice(4)">
-            <div class="tile-top">
-                <div class="icon-circle">
+        <div class="device-card" id="card-4" onclick="toggleDevice(4)">
+            <div class="device-left">
+                <div class="device-icon-box">
                     <svg viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2m0 14H3V5h18z"/></svg>
                 </div>
-                <div class="state-chip" id="chip-4">OFF</div>
+                <div class="device-info">
+                    <h2>Main TV Power</h2>
+                    <p>GPIO 22 • RELAY 04</p>
+                </div>
             </div>
-            <div class="tile-bottom">
-                <div class="device-name">Television</div>
-                <div class="device-sub">Channel 04</div>
-            </div>
+            <div class="pill-switch"><div class="pill-knob"></div></div>
         </div>
     </div>
 
-    <!-- Clean Log Feed -->
-    <div class="live-log-card">
-        <div class="log-title">Telemetry Activity</div>
-        <div class="log-text" id="log-msg">Ready. Connecting to Secure Broker...</div>
+    <!-- Status Strip -->
+    <div class="status-strip">
+        <span>BROKER: <b>EMQX IO</b></span>
+        <span id="log-msg">READY</span>
     </div>
 
     <script>
@@ -458,89 +426,73 @@
         const MQTT_PORT = 8084;
         const TOPIC_RELAY = "dheeraj_emo_hub_9921/control/relay";
         const TOPIC_STATUS_WILDCARD = "dheeraj_emo_hub_9921/status/#";
-        const CLIENT_ID = "emo_web_nexus_" + Math.random().toString(16).substr(2, 8);
+        const CLIENT_ID = "emo_classic_" + Math.random().toString(16).substr(2, 8);
 
         const states = { 1: false, 2: false, 3: false, 4: false };
         let mqttConnected = false;
         const mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), CLIENT_ID);
 
-        function setStatus(text, statusClass) {
-            const badge = document.getElementById("net-status");
-            const label = document.getElementById("net-label");
-            label.innerText = text;
-            badge.className = "status-pill " + statusClass;
-        }
-
-        function setLog(text) {
-            document.getElementById("log-msg").innerText = text;
-        }
-
-        function triggerHaptic() {
-            if ("vibrate" in navigator) {
-                navigator.vibrate(25);
-            }
-        }
-
-        function applyVisuals(id, state) {
+        function updateUI(id, state) {
             states[id] = state;
-            const tile = document.getElementById(`tile-${id}`);
-            const chip = document.getElementById(`chip-${id}`);
-
-            if (state) {
-                tile.classList.add("active");
-                chip.innerText = "ON";
-            } else {
-                tile.classList.remove("active");
-                chip.innerText = "OFF";
+            const card = document.getElementById(`card-${id}`);
+            if (card) {
+                if (state) card.classList.add("active");
+                else card.classList.remove("active");
             }
 
-            // Room ambient glow check
-            if (states[1] || states[2]) {
-                document.body.classList.add("ambient-lit");
-            } else {
-                document.body.classList.remove("ambient-lit");
-            }
+            // Update active count
+            const count = Object.values(states).filter(Boolean).length;
+            document.getElementById("active-count").innerText = `${count} Active`;
+        }
+
+        function triggerVibe() {
+            if ("vibrate" in navigator) navigator.vibrate(20);
         }
 
         function toggleDevice(id) {
-            triggerHaptic();
-            const nextState = !states[id];
-            applyVisuals(id, nextState);
+            triggerVibe();
+            const next = !states[id];
+            updateUI(id, next);
 
             if (mqttConnected) {
-                const payload = JSON.stringify({ id: Number(id), state: nextState ? 1 : 0 });
+                const payload = JSON.stringify({ id: Number(id), state: next ? 1 : 0 });
                 const message = new Paho.MQTT.Message(payload);
                 message.destinationName = TOPIC_RELAY;
                 message.qos = 1;
                 mqttClient.send(message);
-                setLog(`Executed -> Channel 0${id} set to ${nextState ? 'ACTIVE' : 'IDLE'}`);
-            } else {
-                setLog("Network warning: Disconnected from broker.");
+                document.getElementById("log-msg").innerText = `DEV 0${id} -> ${next ? 'ON' : 'OFF'}`;
             }
         }
 
-        // --- Live Sync Arrived from ESP32 / Cloud ---
-        mqttClient.onMessageArrived = function (message) {
+        function masterControl(state) {
+            triggerVibe();
+            for (let i = 1; i <= 4; i++) {
+                if (states[i] !== state) {
+                    toggleDevice(i);
+                }
+            }
+        }
+
+        // Live Retained Sync
+        mqttClient.onMessageArrived = function (msg) {
             try {
-                const data = JSON.parse(message.payloadString);
+                const data = JSON.parse(msg.payloadString);
                 const id = Number(data.id);
                 const state = (Number(data.state) === 1);
-                applyVisuals(id, state);
-                setLog(`Live Sync: Device 0${id} verified [${state ? 'ON' : 'OFF'}]`);
-            } catch (e) {
-                console.error("Payload parse error", e);
-            }
+                updateUI(id, state);
+                document.getElementById("log-msg").innerText = `SYNC DEV 0${id}`;
+            } catch (e) {}
         };
 
         mqttClient.onConnectionLost = function () {
             mqttConnected = false;
-            setStatus("OFFLINE", "offline");
-            setLog("Link lost. Retrying in 3 seconds...");
+            const badge = document.getElementById("net-badge");
+            badge.className = "net-badge offline";
+            document.getElementById("net-text").innerText = "OFFLINE";
             setTimeout(connectBroker, 3000);
         };
 
         function connectBroker() {
-            setStatus("CONNECTING", "");
             mqttClient.connect({
                 useSSL: true,
                 timeout: 5,
@@ -548,13 +500,16 @@
                 cleanSession: false,
                 onSuccess: function () {
                     mqttConnected = true;
-                    setStatus("ONLINE", "online");
-                    setLog("Subscribed to EMO Hub Cloud. Ready.");
+                    const badge = document.getElementById("net-badge");
+                    badge.className = "net-badge online";
+                    document.getElementById("net-text").innerText = "CONNECTED";
                     mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 1 });
                 },
                 onFailure: function () {
                     mqttConnected = false;
-                    setStatus("ERROR", "offline");
+                    const badge = document.getElementById("net-badge");
+                    badge.className = "net-badge offline";
+                    document.getElementById("net-text").innerText = "RETRYING";
                     setTimeout(connectBroker, 5000);
                 }
             });
