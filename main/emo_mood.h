@@ -26,7 +26,7 @@ public:
                     engine->RunTaskLoop();
                 },
                 "EmoMoodTask",
-                4096,              // 4KB Safe Stack (Stack Overflow fix)
+                4096,              // 4KB Safe Stack
                 this,
                 2,                 // Task Priority
                 &task_handle_,
@@ -50,17 +50,26 @@ public:
 
             idle_seconds_ += 10;
 
-            // Stage 1: 40 seconds idle -> funny / neutral
+            // Stage 1: 40s se 90s -> thinking
             if (idle_seconds_ >= 40 && idle_seconds_ < 90) {
-                display_->SetEmotion("thinking"); // Lowercase "funny"
+                display_->SetEmotion("thinking");
             }
-            // Stage 2: 90 seconds (1.5 min) idle -> sad
+            // Stage 2: 90s se 150s -> angry
             else if (idle_seconds_ >= 90 && idle_seconds_ < 150) {
                 display_->SetEmotion("angry");
             }
-            // Stage 3: 150 seconds (2.5 min) idle -> sleepy
-            else if (idle_seconds_ >= 150) {
+            // Stage 3: 150s se 330s (pure 3 min) -> sleepy
+            else if (idle_seconds_ >= 150 && idle_seconds_ < 330) {
                 display_->SetEmotion("sleepy");
+            }
+            // Stage 4: Sleepy ke 3 min baad (330s se 370s) -> neutral
+            else if (idle_seconds_ >= 330 && idle_seconds_ < 370) {
+                display_->SetEmotion("neutral");
+            }
+            // Loop Reset: 370s ke baad seedha wapas Stage 1 (40s) se repeat
+            else if (idle_seconds_ >= 370) {
+                idle_seconds_ = 40;
+                display_->SetEmotion("thinking");
             }
         }
     }
@@ -78,7 +87,3 @@ private:
     TaskHandle_t task_handle_;
     std::atomic<uint32_t> idle_seconds_;
 };
-
-
-
-
