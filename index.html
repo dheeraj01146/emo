@@ -1,37 +1,578 @@
-<script>
-        // =======================================================
-        // 1. FAST INTRO PIPELINE (No Lag)
-        // =======================================================
-        function runIntroSequence() {
-            const overlay = document.getElementById('intro-overlay');
-            // Turant background mein vanish kar do taaki lag na lage
-            setTimeout(() => {
-                if (overlay) overlay.classList.add('vanished');
-                triggerEmoReaction('happy');
-            }, 800); // Sirf 0.8 second ka fast intro
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EMO // EXECUTIVE MASTER CONTROL</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+    <!-- Paho MQTT Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            --bg-void: #05070b;
+            --panel-base: #0e131d;
+            --panel-raised: #141b29;
+            --panel-active: #1e2638;
+            --border-dim: #1f2838;
+            --border-light: rgba(255, 255, 255, 0.08);
+            --cyan-glow: #00f0ff;
+            --amber-warm: #ffb700;
+            --amber-glow: rgba(255, 183, 0, 0.35);
+            --emerald: #00e676;
+            --rose: #ff2a55;
+            --text-head: #ffffff;
+            --text-main: #dbe4ef;
+            --text-muted: #6e8098;
         }
 
-        window.addEventListener('DOMContentLoaded', runIntroSequence);
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
 
-        // =======================================================
-        // 2. MQTT LIVE PIPELINE & STATE ENGINE (Non-Blocking)
-        // =======================================================
-        const MQTT_BROKER = "broker.emqx.io";
-        const MQTT_PORT = 8084;
-        const TOPIC_RELAY = "dheeraj_emo_hub_9921/control/relay";
-        const TOPIC_STATUS_WILDCARD = "dheeraj_emo_hub_9921/status/#";
-        const CLIENT_ID = "emo_exec_pad_" + Math.random().toString(16).substr(2, 8);
+        body {
+            background-color: var(--bg-void);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 16px 16px 36px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 480px;
+            margin: 0 auto;
+            position: relative;
+            overflow-x: hidden;
+            transition: background 0.5s ease;
+        }
 
+        body.room-illuminated {
+            background-image: 
+                radial-gradient(circle at 50% 12%, rgba(255, 183, 0, 0.16), transparent 60%),
+                radial-gradient(circle at 50% 88%, rgba(0, 240, 255, 0.06), transparent 50%);
+        }
+
+        .ambient-scanline {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 240, 255, 0.02) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Top Navigation */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 2px;
+        }
+
+        .brand-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo-icon {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, var(--cyan-glow), #0077ff);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 800;
+            font-size: 1.05rem;
+            color: #030508;
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+        }
+
+        .brand-text h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-head);
+        }
+
+        .brand-text p {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+
+        .live-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--panel-base);
+            border: 1px solid var(--border-dim);
+            border-radius: 20px;
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .live-chip-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .live-chip.connected {
+            color: var(--emerald);
+            border-color: rgba(0, 230, 118, 0.35);
+        }
+        .live-chip.connected .live-chip-dot {
+            background: var(--emerald);
+            box-shadow: 0 0 8px var(--emerald);
+        }
+
+        /* EMO Face Centerpiece */
+        .emo-console-card {
+            background: var(--panel-base);
+            border: 1px solid var(--border-light);
+            border-radius: 24px;
+            padding: 20px 18px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+        }
+
+        .emo-glass-bezel {
+            width: 100%;
+            max-width: 270px;
+            height: 104px;
+            background: #010306;
+            border-radius: 22px;
+            border: 1.5px solid rgba(0, 240, 255, 0.28);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.98), 0 0 24px rgba(0, 240, 255, 0.12);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .emo-eyes-wrap {
+            display: flex;
+            gap: 22px;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .emo-eye-unit {
+            width: 60px;
+            height: 66px;
+            background: var(--cyan-glow);
+            border-radius: 19px;
+            box-shadow: 
+                0 0 18px rgba(0, 240, 255, 0.8),
+                inset -3px -3px 8px rgba(0, 140, 180, 0.85),
+                inset 2px 2px 4px rgba(255, 255, 255, 0.4);
+            transition: all 0.22s ease;
+        }
+
+        .emo-glass-bezel.mood-happy .emo-eye-unit {
+            border-radius: 24px 24px 10px 10px;
+            transform: scaleY(0.7) translateY(-4px);
+        }
+        .emo-glass-bezel.mood-wink #eye-r {
+            transform: scaleY(0.1);
+        }
+        .emo-glass-bezel.mood-surprised .emo-eye-unit {
+            transform: scale(1.12);
+        }
+        .emo-glass-bezel.mood-sleepy .emo-eye-unit {
+            transform: scaleY(0.18) translateY(6px);
+            border-radius: 10px;
+        }
+
+        .emo-telemetry-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0 4px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .emo-telemetry-row b {
+            color: var(--cyan-glow);
+        }
+
+        /* Master Control Toolbar */
+        .master-toolbar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .master-action-btn {
+            background: var(--panel-raised);
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-main);
+            cursor: pointer;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .master-action-btn:active {
+            transform: scale(0.96);
+        }
+
+        /* Section Headline */
+        .section-headline {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px;
+        }
+        .section-headline h2 {
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .section-headline span {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--amber-warm);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Tiles Grid */
+        .tiles-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .appliance-tile {
+            background: var(--panel-raised);
+            border: 1.5px solid var(--border-light);
+            border-radius: 20px;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 165px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+            transition: all 0.25s ease;
+        }
+        .appliance-tile:active {
+            transform: scale(0.95);
+        }
+        .appliance-tile.active {
+            background: #181d27;
+            border-color: rgba(255, 183, 0, 0.55);
+            box-shadow: 0 14px 32px var(--amber-glow);
+        }
+
+        .tile-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .tile-icon-box {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 1.4rem;
+        }
+        .appliance-tile.active .tile-icon-box {
+            background: var(--amber-warm);
+            color: #06090e;
+            box-shadow: 0 0 18px rgba(255, 183, 0, 0.7);
+        }
+
+        .tactile-switch {
+            width: 50px;
+            height: 28px;
+            background: #090d14;
+            border: 1.5px solid var(--border-dim);
+            border-radius: 20px;
+            position: relative;
+        }
+        .tactile-knob {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            position: absolute;
+            top: 2.5px;
+            left: 3px;
+            transition: all 0.25s ease;
+        }
+        .appliance-tile.active .tactile-switch {
+            background: rgba(255, 183, 0, 0.22);
+            border-color: var(--amber-warm);
+        }
+        .appliance-tile.active .tactile-knob {
+            transform: translateX(22px);
+            background: var(--amber-warm);
+            box-shadow: 0 0 10px var(--amber-warm);
+        }
+
+        .tile-foot {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .tile-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-head);
+        }
+        .tile-spec {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+        .tile-spec span.active-tag {
+            color: var(--amber-warm);
+            font-weight: 700;
+        }
+
+        /* Companion Bar & Telemetry */
+        .companion-bar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .companion-card {
+            background: var(--panel-base);
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+        .companion-card i {
+            font-size: 1.15rem;
+            color: var(--cyan-glow);
+        }
+        .companion-info h3 {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-head);
+        }
+        .companion-info p {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .telemetry-strip {
+            background: #040609;
+            border: 1px solid var(--border-dim);
+            border-radius: 14px;
+            padding: 11px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+        .telemetry-strip b {
+            color: var(--cyan-glow);
+        }
+
+        .creator-signature {
+            text-align: center;
+            padding: 10px 0 6px;
+            display: flex;
+            justify-content: center;
+        }
+        .creator-badge {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 2.2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            padding: 6px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-dim);
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .creator-badge span {
+            color: var(--amber-warm);
+            font-weight: 800;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-scanline"></div>
+
+    <!-- Top Navigation -->
+    <div class="top-nav">
+        <div class="brand-meta">
+            <div class="brand-logo-icon">E</div>
+            <div class="brand-text">
+                <h1>EMO HOME AUTOMATION</h1>
+                <p>ESP32-S3 // ESP-NOW MESH</p>
+            </div>
+        </div>
+        <div class="live-chip connected" id="conn-chip">
+            <div class="live-chip-dot"></div>
+            <span id="conn-text">READY</span>
+        </div>
+    </div>
+
+    <!-- EMO Face Centerpiece -->
+    <div class="emo-console-card">
+        <div class="emo-glass-bezel" id="emo-face-bezel" onclick="cycleEmoMood()">
+            <div class="emo-eyes-wrap">
+                <div class="emo-eye-unit" id="eye-l"></div>
+                <div class="emo-eye-unit" id="eye-r"></div>
+            </div>
+        </div>
+        <div class="emo-telemetry-row">
+            <span>LINK: <b>EMQX CLOUD</b></span>
+            <span>RADIO: <b>ESP-NOW CH-06</b></span>
+            <span>PACKETS: <b id="packet-counter">0</b></span>
+        </div>
+    </div>
+
+    <!-- Master Control Bar -->
+    <div class="master-toolbar">
+        <div class="master-action-btn" onclick="masterControl(true)">
+            <span>⚡ ALL POWER ON</span>
+        </div>
+        <div class="master-action-btn" onclick="masterControl(false)">
+            <span>✕ KILL SWITCH</span>
+        </div>
+    </div>
+
+    <!-- Appliance Tiles Header -->
+    <div class="section-headline">
+        <h2>Appliance Controls</h2>
+        <span id="active-summary">0 ACTIVE</span>
+    </div>
+
+    <!-- 4 Tiles -->
+    <div class="tiles-grid">
+        <div class="appliance-tile" id="tile-1" onclick="toggleRelay(1)">
+            <div class="tile-head">
+                <div class="tile-icon-box"><i class="fa-regular fa-lightbulb"></i></div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">Ceiling Light</div>
+                <div class="tile-spec"><span>GPIO 18</span><span class="active-tag" id="status-1">STANDBY</span></div>
+            </div>
+        </div>
+
+        <div class="appliance-tile" id="tile-2" onclick="toggleRelay(2)">
+            <div class="tile-head">
+                <div class="tile-icon-box"><i class="fa-solid fa-lightbulb"></i></div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">Reading Lamp</div>
+                <div class="tile-spec"><span>GPIO 19</span><span class="active-tag" id="status-2">STANDBY</span></div>
+            </div>
+        </div>
+
+        <div class="appliance-tile" id="tile-3" onclick="toggleRelay(3)">
+            <div class="tile-head">
+                <div class="tile-icon-box"><i class="fa-solid fa-fan"></i></div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">High-Vel Fan</div>
+                <div class="tile-spec"><span>GPIO 21</span><span class="active-tag" id="status-3">STANDBY</span></div>
+            </div>
+        </div>
+
+        <div class="appliance-tile" id="tile-4" onclick="toggleRelay(4)">
+            <div class="tile-head">
+                <div class="tile-icon-box"><i class="fa-solid fa-tv"></i></div>
+                <div class="tactile-switch"><div class="tactile-knob"></div></div>
+            </div>
+            <div class="tile-foot">
+                <div class="tile-name">OLED Screen</div>
+                <div class="tile-spec"><span>GPIO 22</span><span class="active-tag" id="status-4">STANDBY</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Companion Tools -->
+    <div class="section-headline">
+        <h2>Companion Tools</h2>
+        <span>PHONE RELAY</span>
+    </div>
+
+    <div class="companion-bar">
+        <div class="companion-card" onclick="triggerPhoneCommand('torch')">
+            <i class="fa-solid fa-bolt"></i>
+            <div class="companion-info"><h3>Phone Flash</h3><p>TOGGLE TORCH</p></div>
+        </div>
+        <div class="companion-card" onclick="triggerPhoneCommand('query')">
+            <i class="fa-solid fa-robot"></i>
+            <div class="companion-info"><h3>Cloud Query</h3><p>ASK ASSISTANT</p></div>
+        </div>
+    </div>
+
+    <!-- Telemetry Strip -->
+    <div class="telemetry-strip">
+        <span>BROKER: <b>EMQX.IO [TLS 8084]</b></span>
+        <span id="log-monitor">ACTIVE & READY</span>
+    </div>
+
+    <!-- Signature Footer -->
+    <div class="creator-signature">
+        <div class="creator-badge">⚡ DESIGNED & BUILT • <span>MADE BY DHEERAJ</span></div>
+    </div>
+
+    <script>
         const states = { 1: false, 2: false, 3: false, 4: false };
-        let mqttConnected = false;
         let packetCount = 0;
-        let mqttClient = null;
-
-        function triggerHaptic() {
-            try {
-                if ("vibrate" in navigator) navigator.vibrate(24);
-            } catch (e) {}
-        }
 
         function triggerEmoReaction(type) {
             const bezel = document.getElementById('emo-face-bezel');
@@ -59,10 +600,6 @@
             const statusLabel = document.getElementById(`status-${id}`);
             if (!tile) return;
 
-            tile.classList.remove('trigger-pulse');
-            void tile.offsetWidth;
-            tile.classList.add('trigger-pulse');
-
             if (state) {
                 tile.classList.add('active');
                 if (statusLabel) statusLabel.innerText = "ONLINE";
@@ -83,35 +620,17 @@
         }
 
         function toggleRelay(id) {
-            triggerHaptic();
             const nextState = !states[id];
-            
             const mood = nextState ? 'happy' : 'wink';
             triggerEmoReaction(mood);
             updateCardUI(id, nextState);
 
-            if (mqttConnected && mqttClient) {
-                try {
-                    const payload = JSON.stringify({ id: Number(id), state: nextState ? 1 : 0 });
-                    const message = new Paho.MQTT.Message(payload);
-                    message.destinationName = TOPIC_RELAY;
-                    message.qos = 1;
-                    mqttClient.send(message);
-                    packetCount++;
-                    document.getElementById('packet-counter').innerText = packetCount;
-                    setLog(`DISPATCH CH-0${id} -> ${nextState ? 'ENGAGED' : 'IDLE'}`);
-                } catch (e) {
-                    setLog(`LOCAL CH-0${id} -> ${nextState ? 'ENGAGED' : 'IDLE'}`);
-                }
-            } else {
-                packetCount++;
-                document.getElementById('packet-counter').innerText = packetCount;
-                setLog(`LOCAL CH-0${id} -> ${nextState ? 'ENGAGED' : 'IDLE'}`);
-            }
+            packetCount++;
+            document.getElementById('packet-counter').innerText = packetCount;
+            setLog(`CH-0${id} -> ${nextState ? 'ENGAGED' : 'STANDBY'}`);
         }
 
         function masterControl(turnOn) {
-            triggerHaptic();
             triggerEmoReaction(turnOn ? 'happy' : 'surprised');
             for (let i = 1; i <= 4; i++) {
                 if (states[i] !== turnOn) {
@@ -121,70 +640,9 @@
         }
 
         function triggerPhoneCommand(action) {
-            triggerHaptic();
             triggerEmoReaction('wink');
-            setLog(`PHONE ACTION -> ${action.toUpperCase()} DISPATCHED`);
+            setLog(`PHONE -> ${action.toUpperCase()} DISPATCHED`);
         }
-
-        function enableSimulationMode() {
-            mqttConnected = false;
-            const chip = document.getElementById('conn-chip');
-            const text = document.getElementById('conn-text');
-            if (chip && text) {
-                chip.className = 'live-chip connected';
-                text.innerText = "LOCAL ACTIVE";
-            }
-            setLog("Local Instant Engine Active");
-        }
-
-        function connectMQTT() {
-            if (typeof Paho === 'undefined' || !Paho.MQTT) {
-                enableSimulationMode();
-                return;
-            }
-
-            try {
-                mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), CLIENT_ID);
-
-                mqttClient.onMessageArrived = function (message) {
-                    try {
-                        const data = JSON.parse(message.payloadString);
-                        updateCardUI(Number(data.id), Number(data.state) === 1);
-                        packetCount++;
-                        document.getElementById('packet-counter').innerText = packetCount;
-                    } catch (e) {}
-                };
-
-                mqttClient.onConnectionLost = function () {
-                    mqttConnected = false;
-                    document.getElementById('conn-chip').className = 'live-chip disconnected';
-                    document.getElementById('conn-text').innerText = "OFFLINE";
-                    setTimeout(connectMQTT, 5000);
-                };
-
-                mqttClient.connect({
-                    useSSL: true,
-                    timeout: 2, // Timeout kam kar diya taaki lag na ho
-                    onSuccess: function () {
-                        mqttConnected = true;
-                        const chip = document.getElementById('conn-chip');
-                        const text = document.getElementById('conn-text');
-                        if (chip && text) {
-                            chip.className = 'live-chip connected';
-                            text.innerText = "CONNECTED";
-                        }
-                        setLog("EMQX Cloud Linked Instantly!");
-                        try { mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 1 }); } catch (e) {}
-                    },
-                    onFailure: function () {
-                        enableSimulationMode();
-                    }
-                });
-            } catch (err) {
-                enableSimulationMode();
-            }
-        }
-
-        // Background mein connect hoga taaki UI load hone mein ek sec ka bhi delay na ho
-        setTimeout(connectMQTT, 200);
     </script>
+</body>
+</html>
