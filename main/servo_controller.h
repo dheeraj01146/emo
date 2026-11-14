@@ -1,134 +1,98 @@
 #pragma once
 
-#include "driver/ledc.h"
-#include "driver/gpio.h"
-#include <esp_random.h>
+#include "display.h"
+#include "servo_controller.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <cmath>
+#include <esp_log.h>
+#include <atomic>
+#include <cstring>
 
-#define SERVO_PIN           GPIO_NUM_18
-// Timer 2 aur Channel 2 use karein taaki Backlight (Timer 0/1) se takraye nahi
-#define SERVO_LEDC_TIMER    LEDC_TIMER_2
-#define SERVO_LEDC_MODE     LEDC_LOW_SPEED_MODE
-#define SERVO_LEDC_CHANNEL  LEDC_CHANNEL_2
-#define SERVO_LEDC_RES      LEDC_TIMER_14_BIT
+#define MOOD_TAG "EmoMood"
 
-class ServoController {
+class EmoMoodEngine {
 public:
-    static ServoController& GetInstance() {
-        static ServoController instance;
+    static EmoMoodEngine& GetInstance() {
+        static EmoMoodEngine instance;
         return instance;
     }
 
-    void Initialize() {
-        // Step A: GPIO 18 ko kisi bhi internal USB/default function se detach karke GPIO mode me lao
-        gpio_reset_pin(SERVO_PIN);
-        gpio_set_direction(SERVO_PIN, GPIO_MODE_OUTPUT);
+    void Start(Display* display) {
+        display_ = display;
+        idle_seconds_ = 0;
 
-        // Step B: Dedicated Timer 2 Setup
-        ledc_timer_config_t timer_conf = {
-            .speed_mode = SERVO_LEDC_MODE,
-            .duty_resolution = SERVO_LEDC_RES,
-            .timer_num = SERVO_LEDC_TIMER,
-            .freq_hz = 50,
-            .clk_cfg = LEDC_AUTO_CLK
-        };
-        ledc_timer_config(&timer_conf);
-
-        // Step C: Dedicated Channel 2 Setup
-        ledc_channel_config_t channel_conf = {
-            .gpio_num = SERVO_PIN,
-            .speed_mode = SERVO_LEDC_MODE,
-            .channel = SERVO_LEDC_CHANNEL,
-            .intr_type = LEDC_INTR_DISABLE,
-            .timer_sel = SERVO_LEDC_TIMER,
-            .duty = 0,
-            .hpoint = 0
-        };
-        ledc_channel_config(&channel_conf);
-
-        current_angle_ = 90.0f;
-        target_angle_ = 90.0f;
-        step_speed_ = 1.0f;
-        ApplyHardwareAngle(90.0f);
-
-        xTaskCreate([](void* arg) {
-            static_cast<ServoController*>(arg)->SmoothTask();
-        }, "servo_smooth", 2048, this, 3, nullptr);
-    }
-
-    void SetTarget(float angle, float speed = 1.0f) {
-        if (angle < 50.0f) angle = 50.0f;
-        if (angle > 130.0f) angle = 130.0f;
-        target_angle_ = angle;
-        step_speed_ = speed;
-    }
-
-    void OnIdleTick() {
-        int r = esp_random() % 100;
-        if (r < 15) {
-            float target = 72.0f + (esp_random() % 37);
-            SetTarget(target, 0.6f);
-        } else if (r < 25) {
-            SetTarget(90.0f, 0.8f);
+        if (task_handle_ == nullptr) {
+            xTaskCreatePinnedToCore(
+                [](void* arg) {
+                    auto* engine = static_cast<EmoMoodEngine*>(arg);
+                    engine->RunTaskLoop();
+                },
+                "EmoMoodTask",
+                4096,              // 4KB Safe Stack
+                this,
+                2,                 // Task Priority
+                &task_handle_,
+                1                  // Core 1 par pin
+            );
+            ESP_LOGI(MOOD_TAG, "Mood engine task started successfully with 4KB stack");
         }
     }
 
-    void OnListening() {
-        SetTarget(90.0f, 1.5f);
+    void ResetInteraction(const char* wake_emotion = "neutral") {
+        idle_seconds_ = 0;
+        if (display_ != nullptr && wake_emotion != nullptr) {
+            display_->SetEmotion(wake_emotion);
+            ServoController::GetInstance().SetDirection(wake_emotion);
+        }
     }
 
-    void OnSpeakingTick() {
-        static int action_cooldown = 0;
-        if (action_cooldown > 0) {
-            action_cooldown--;
-            return;
-        }
+    void RunTaskLoop() {
+        const char* last_emotion = nullptr;
+        while (true) {
+            vTaskDelay(pdMS_TO_TICKS(10000)); // Har 10 second delay
+            if (display_ == nullptr) continue;
 
-        int r = esp_random() % 100;
-        if (r < 35) {
-            SetTarget(78.0f + (esp_random() % 7), 1.2f);
-            action_cooldown = 1;
-        } else if (r < 70) {
-            SetTarget(95.0f + (esp_random() % 7), 1.2f);
-            action_cooldown = 1;
-        } else if (r < 85) {
-            float tilt = (esp_random() % 2 == 0) ? 66.0f : 114.0f;
-            SetTarget(tilt, 1.6f);
-            action_cooldown = 2;
-        } else {
-            SetTarget(90.0f, 1.0f);
-            action_cooldown = 1;
+            idle_seconds_ += 10;
+            const char* target_emotion = "happy";
+
+            if (idle_seconds_ < 40) {
+                target_emotion = "happy";
+            } else if (idle_seconds_ >= 40 && idle_seconds_ < 90) {
+                target_emotion = "thinking"; // Left/Thinking look
+            } else if (idle_seconds_ >= 90 && idle_seconds_ < 150) {
+                target_emotion = "angry";    // Right/Angry look
+            } else if (idle_seconds_ >= 150 && idle_seconds_ < 330) {
+                target_emotion = "sleepy";   // Sleepy down/tilt
+            } else if (idle_seconds_ >= 330 && idle_seconds_ < 370) {
+                target_emotion = "neutral";  // Center
+            } else {
+                idle_seconds_ = 40;          // Loop reset
+                target_emotion = "thinking";
+            }
+
+            // Sirf tabhi update karega jab emotion actually change ho
+            if (last_emotion != target_emotion) {
+                display_->SetEmotion(target_emotion);
+                
+                // Display ke sath servo ki direction sync kar di!
+                ServoController::GetInstance().SetDirection(target_emotion);
+                
+                last_emotion = target_emotion;
+                ESP_LOGI(MOOD_TAG, "Emotion & Servo Synced -> %s", target_emotion);
+            }
         }
     }
 
 private:
-    ServoController() = default;
-
-    float current_angle_ = 90.0f;
-    float target_angle_ = 90.0f;
-    float step_speed_ = 1.0f;
-
-    void ApplyHardwareAngle(float angle) {
-        float pulse_us = 500.0f + (angle / 180.0f) * 2000.0f;
-        uint32_t duty = (uint32_t)((pulse_us / 20000.0f) * 16384.0f);
-        ledc_set_duty(SERVO_LEDC_MODE, SERVO_LEDC_CHANNEL, duty);
-        ledc_update_duty(SERVO_LEDC_MODE, SERVO_LEDC_CHANNEL);
-    }
-
-    void SmoothTask() {
-        while (true) {
-            float diff = target_angle_ - current_angle_;
-            if (std::abs(diff) > 0.3f) {
-                if (std::abs(diff) < step_speed_) {
-                    current_angle_ = target_angle_;
-                } else {
-                    current_angle_ += (diff > 0) ? step_speed_ : -step_speed_;
-                }
-                ApplyHardwareAngle(current_angle_);
-            }
-            vTaskDelay(pdMS_TO_TICKS(20));
+    EmoMoodEngine() : display_(nullptr), task_handle_(nullptr), idle_seconds_(0) {}
+    ~EmoMoodEngine() {
+        if (task_handle_ != nullptr) {
+            vTaskDelete(task_handle_);
+            task_handle_ = nullptr;
         }
     }
+
+    Display* display_;
+    TaskHandle_t task_handle_;
+    std::atomic<uint32_t> idle_seconds_;
 };
