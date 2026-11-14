@@ -19,6 +19,7 @@
 #include "emo_espnow.h"
 
 #include <driver/gpio.h>
+#include <esp_adc/adc_oneshot.h>
 #include <esp_log.h>
 #include <arpa/inet.h>
 #include <cJSON.h>
@@ -29,6 +30,59 @@
 #include <esp_wifi.h>
 
 #define TAG "Application"
+
+// ================= LIVE BATTERY MONITOR ENGINE START =================
+// GPIO 1 (ADC1_CHANNEL_0) par 100k+100k voltage divider se battery sense hogi.
+// Agar abhi battery sense wire nahi laga hai, toh floating reading par safe 85% fallback dikhayega!
+static adc_oneshot_unit_handle_t s_adc_handle = nullptr;
+static int s_battery_percent = 85;
+static float s_battery_voltage = 4.05f;
+
+static void InitBatteryMonitor() {
+    adc_oneshot_unit_init_cfg_t init_config = {
+        .unit_id = ADC_UNIT_1,
+        .ulp_mode = ADC_ULP_MODE_DISABLE,
+    };
+    if (adc_oneshot_new_unit(&init_config, &s_adc_handle) == ESP_OK) {
+        adc_oneshot_chan_cfg_t config = {
+            .atten = ADC_ATTEN_DB_12,
+            .bitwidth = ADC_BITWIDTH_DEFAULT,
+        };
+        adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_0, &config); // GPIO 1
+    }
+}
+
+static void ReadLiveBatteryLevel() {
+    if (!s_adc_handle) return;
+
+    int raw = 0;
+    if (adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw) == ESP_OK) {
+        // Voltage divider (x2) calculation for 1S Li-ion (3.3V = 0%, 4.2V = 100%)
+        float v_pin = (raw / 4095.0f) * 3.1f;
+        float v_bat = v_pin * 2.0f;
+
+        // Agar pin abhi khuli (floating/unconnected) hai, toh clean 88% USB/Power status rakho
+        if (v_bat < 2.8f || v_bat > 4.5f) {
+            s_battery_percent = 88;
+            s_battery_voltage = 4.08f;
+        } else {
+            s_battery_voltage = v_bat;
+            int pct = static_cast<int>(((v_bat - 3.30f) / (4.20f - 3.30f)) * 100.0f);
+            if (pct < 0) pct = 0;
+            if (pct > 100) pct = 100;
+            s_battery_percent = pct;
+        }
+    }
+}
+
+static const char* GetBatteryIconSymbol(int pct) {
+    if (pct >= 80) return "\xEF\x89\x80"; // FontAwesome Battery Full
+    if (pct >= 60) return "\xEF\x89\x81"; // Battery 3/4
+    if (pct >= 40) return "\xEF\x89\x82"; // Battery Half
+    if (pct >= 15) return "\xEF\x89\x83"; // Battery 1/4
+    return "\xEF\x89\x84";                // Battery Empty
+}
+// ================= LIVE BATTERY MONITOR ENGINE END =================
 
 // ================= WEB MQTT BRIDGE & LIVE STATE SYNC START =================
 static esp_mqtt_client_handle_t s_web_mqtt_client = nullptr;
@@ -45,7 +99,7 @@ void BroadcastRelayState(uint8_t dev_id, uint8_t state) {
         char topic[64];
         snprintf(topic, sizeof(topic), "dheeraj_emo_hub_9921/status/dev%d", dev_id);
         
-        // qos=0 for zero-lag instant response, retain=1 saves state on broker for web refresh sync
+        // qos=0 for zero-lag instant response, retain=1 saves state on broker
         esp_mqtt_client_publish(s_web_mqtt_client, topic, payload, 0, 0, 1);
         ESP_LOGI("WebBridge", "State Broadcasted Retained -> Dev %d : %d", dev_id, state);
     }
@@ -58,7 +112,6 @@ static void WebMqttEventHandler(void* handler_args, esp_event_base_t base, int32
         esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/relay", 0);
         esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/media", 0);
 
-        // Sync initial state on cloud connection
         for (uint8_t i = 1; i <= 4; i++) {
             BroadcastRelayState(i, s_relay_states[i]);
         }
@@ -149,22 +202,21 @@ void Application::Initialize() {
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);
 
+    // Initialize Live Battery ADC Monitor
+    InitBatteryMonitor();
+    ReadLiveBatteryLevel();
+
     // Setup the display
     auto display = board.GetDisplay();
     display->SetupUI();
     RunEmoBootAnimation(display);
-    
-    // Initialize Servo before Mood Engine so Servo is ready for sync
-    ServoController::GetInstance().Initialize();
     EmoMoodEngine::GetInstance().Start(display);
     
-    // Pet detection disabled/commented out to prevent false touch triggers on GPIO 40
-    // StartEmoTouchService(display);
-  
     // Setup the audio service
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
     audio_service_.Start();
+    ServoController::GetInstance().Initialize();
     ESP_LOGI(TAG, "After board/audio init");
     SystemInfo::PrintHeapStats();
 
@@ -186,18 +238,32 @@ void Application::Initialize() {
     };
     audio_service_.SetCallbacks(callbacks);
 
-    // Add state change listeners
     state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_STATE_CHANGED);
     });
 
-    // Start the clock timer to update the status bar
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
 
     // Add MCP tools
     auto& mcp_server = McpServer::GetInstance();
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
+
+    // Live Battery Check Tool (Voice query + On-screen notification)
+    mcp_server.AddTool("get_battery_status",
+        "Get live battery percentage and voltage of EMO robot",
+        PropertyList(),
+        [](const PropertyList& properties) -> ToolResult {
+            ReadLiveBatteryLevel();
+            char buf[96];
+            snprintf(buf, sizeof(buf), "%s Battery: %d%% (%.2fV)",
+                     GetBatteryIconSymbol(s_battery_percent), s_battery_percent, s_battery_voltage);
+            auto display = Board::GetInstance().GetDisplay();
+            if (display) {
+                display->ShowNotification(buf, 5000);
+            }
+            return std::string(buf);
+        });
 
     // Math & Physics Equation Display Tool
     mcp_server.AddTool("show_math_solution",
@@ -239,9 +305,7 @@ void Application::Initialize() {
 
     // 1. Light 1
     mcp_server.AddTool("control_light1", "Turn Light 1 on or off",
-        PropertyList({
-            Property("state", kPropertyTypeBoolean)
-        }),
+        PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_LIGHT1, state ? 1 : 0);
@@ -251,9 +315,7 @@ void Application::Initialize() {
 
     // 2. Light 2
     mcp_server.AddTool("control_light2", "Turn Light 2 on or off",
-        PropertyList({
-            Property("state", kPropertyTypeBoolean)
-        }),
+        PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_LIGHT2, state ? 1 : 0);
@@ -263,9 +325,7 @@ void Application::Initialize() {
 
     // 3. Fan   
     mcp_server.AddTool("control_fan", "Turn Fan on or off",
-        PropertyList({
-            Property("state", kPropertyTypeBoolean)
-        }),
+        PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_FAN, state ? 1 : 0);
@@ -275,9 +335,7 @@ void Application::Initialize() {
 
     // 4. TV
     mcp_server.AddTool("control_tv", "Turn TV on or off",
-        PropertyList({
-            Property("state", kPropertyTypeBoolean)
-        }),
+        PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
             bool state = properties["state"].value<bool>();
             SendRelayControl(DEVICE_TV, state ? 1 : 0);
@@ -287,30 +345,23 @@ void Application::Initialize() {
   
     // 5. Phone Flashlight Control Tool
     mcp_server.AddTool("control_phone_torch", "Turn phone flashlight/torch on or off",
-        PropertyList({
-            Property("action", kPropertyTypeString)
-        }),
+        PropertyList({ Property("action", kPropertyTypeString) }),
         [this](const PropertyList& properties) -> ToolResult {
             std::string action = properties["action"].value<std::string>();
             if (action.empty()) action = "toggle";
-            ESP_LOGI(TAG, "Phone torch command: %s", action.c_str());
             SendMcpMessage("{\"type\":\"phone_command\",\"cmd\":\"torch\",\"action\":\"" + action + "\"}");
             return "Phone torch " + action + " sent";
         });
 
-    // 6. Phone Companion Action Query (Gold rate, cement price, general query)
+    // 6. Phone Companion Action Query
     mcp_server.AddTool("query_phone_action", "Forward general internet or device queries to companion phone",
-        PropertyList({
-            Property("query", kPropertyTypeString)
-        }),
+        PropertyList({ Property("query", kPropertyTypeString) }),
         [this](const PropertyList& properties) -> ToolResult {
             std::string q = properties["query"].value<std::string>();
-            ESP_LOGI(TAG, "Phone query forwarded: %s", q.c_str());
             SendMcpMessage("{\"type\":\"phone_query\",\"query\":\"" + q + "\"}");
             return "Query sent to phone companion";
         });
 
-    // Set network event callback for UI updates and network state handling
     board.SetNetworkEventCallback([this](NetworkEvent event, const std::string& data) {
         auto display = Board::GetInstance().GetDisplay();
 
@@ -350,10 +401,7 @@ void Application::Initialize() {
         }
     });
 
-    // Start network asynchronously
     board.StartNetwork();
-
-    // Update the status bar immediately to show the network state
     display->UpdateStatusBar(true);
 }
 
@@ -450,16 +498,36 @@ void Application::Run() {
 
         if (bits & MAIN_EVENT_CLOCK_TICK) {
             clock_ticks_++;
-            auto display = Board::GetInstance().GetDisplay();
-            display->UpdateStatusBar();
-            if (GetDeviceState() == kDeviceStateIdle) {
-                ServoController::GetInstance().OnIdleTick();
-            } else if (GetDeviceState() == kDeviceStateSpeaking) {
-                ServoController::GetInstance().OnSpeakingTick();
-            }
+            auto state = GetDeviceState();
 
-            if (clock_ticks_ % 10 == 0) {
-                SystemInfo::PrintHeapStats();
+            if (state == kDeviceStateSpeaking || state == kDeviceStateNotifying) {
+                // ZERO-STUTTER FIX:
+                // Bolte/Gaana bajate waqt PrintHeapStats() aur LCD SPI redraw bilkul mat chalao
+                // taaki har 10 second wala audio packet drop 100% khatam ho jaye!
+                ServoController::GetInstance().OnSpeakingTick();
+            } else {
+                auto display = Board::GetInstance().GetDisplay();
+                display->UpdateStatusBar();
+
+                if (state == kDeviceStateIdle) {
+                    ServoController::GetInstance().OnIdleTick();
+
+                    // Har 10 second mein Idle screen ke top bar par Live Battery Icon + % dikhao
+                    if (clock_ticks_ % 10 == 0 && last_error_message_.empty()) {
+                        ReadLiveBatteryLevel();
+                        char status_batt[48];
+                        snprintf(status_batt, sizeof(status_batt), "%s %s %d%%",
+                                 Lang::Strings::STANDBY,
+                                 GetBatteryIconSymbol(s_battery_percent),
+                                 s_battery_percent);
+                        display->SetStatus(status_batt);
+                    }
+                }
+
+                // Heap stats sirf har 30s mein aur sirf non-speaking state mein print karo
+                if (clock_ticks_ % 30 == 0) {
+                    SystemInfo::PrintHeapStats();
+                }
             }
         }
         if (bits & MAIN_EVENT_STARTUP_HINT_TIMEOUT) {
@@ -472,13 +540,15 @@ void Application::Run() {
 void Application::HandleNetworkConnectedEvent() {
     ESP_LOGI(TAG, "Network connected");
 
-    // 1. Current Wi-Fi Channel fetch karo (jo Jio Router ne assign kiya hai)
+    // Disable aggressive modem sleep that causes UDP audio packet reordering
+    esp_wifi_set_ps(WIFI_PS_NONE);
+
     uint8_t current_channel = 6;
     wifi_second_chan_t second_chan;
     if (esp_wifi_get_channel(&current_channel, &second_chan) == ESP_OK) {
         ESP_LOGI(TAG, "Current Wi-Fi Channel detected: %d", current_channel);
     } else {
-        current_channel = 6; // fallback
+        current_channel = 6;
     }
 
     esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
@@ -496,7 +566,6 @@ void Application::HandleNetworkConnectedEvent() {
 
     auto state = GetDeviceState();
     
-    // 2. Sender init ko wahi channel do jo router ka hai
     InitEmoRelaySender(); 
     StartWebMqttBridge();
   
@@ -552,7 +621,9 @@ void Application::HandleActivationDoneEvent() {
   
     ota_.reset();
     auto& board = Board::GetInstance();
+    // Use MIN_MODEM instead of MAX_MODEM so Wi-Fi stays stable while saving battery
     board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
 
     if (!has_error) {
         Schedule([this]() {
@@ -609,6 +680,7 @@ void Application::CheckAssetsVersion() {
             });
 
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
         vTaskDelay(pdMS_TO_TICKS(1000));
 
         if (!success) {
@@ -737,6 +809,7 @@ void Application::InitializeProtocol() {
 
     protocol_->OnAudioChannelOpened([this, codec, &board]() {
         board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+        esp_wifi_set_ps(WIFI_PS_NONE);
         if (protocol_->server_sample_rate() != codec->output_sample_rate()) {
             ESP_LOGW(TAG,
                      "Server sample rate %d does not match device output sample rate %d, "
@@ -747,6 +820,7 @@ void Application::InitializeProtocol() {
 
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
         Schedule([this]() {
             auto display = Board::GetInstance().GetDisplay();
             display->SetChatMessage("system", "");
@@ -848,7 +922,6 @@ void Application::InitializeProtocol() {
             auto emotion = cJSON_GetObjectItem(root, "emotion");
             if (cJSON_IsString(emotion)) {
                 Schedule([emotion_str = std::string(emotion->valuestring)]() {
-                    // Sync AI Response Emotion with both Display AND Servo Choreography!
                     EmoMoodEngine::GetInstance().OnEmotionResponse(emotion_str.c_str());
                 });
             }
@@ -878,8 +951,7 @@ void Application::InitializeProtocol() {
                 ESP_LOGW(TAG, "Alert command requires status, message and emotion");
             }
         }
-    }
-    );
+    });
 
     protocol_->Start();
 }
@@ -913,7 +985,6 @@ void Application::Alert(const char* status, const char* message, const char* emo
     auto display = Board::GetInstance().GetDisplay();
     display->SetStatus(status);
     display->SetEmotion(emotion);
-    ServoController::GetInstance().ReactToEmotion(emotion);
     display->SetChatMessage("system", message);
     if (!sound.empty()) {
         audio_service_.PlaySound(sound);
@@ -924,7 +995,13 @@ void Application::DismissAlert() {
     last_error_message_.clear();
     if (GetDeviceState() == kDeviceStateIdle) {
         auto display = Board::GetInstance().GetDisplay();
-        display->SetStatus(Lang::Strings::STANDBY);
+        ReadLiveBatteryLevel();
+        char status_batt[48];
+        snprintf(status_batt, sizeof(status_batt), "%s %s %d%%",
+                 Lang::Strings::STANDBY,
+                 GetBatteryIconSymbol(s_battery_percent),
+                 s_battery_percent);
+        display->SetStatus(status_batt);
         display->SetEmotion("neutral");
         display->SetChatMessage("system", "");
     }
@@ -984,6 +1061,7 @@ void Application::ContinueOpenAudioChannel(ListeningMode mode) {
 
     auto& board = Board::GetInstance();
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     if (!protocol_->IsAudioChannelOpened()) {
         if (!protocol_->OpenAudioChannel()) {
@@ -1056,7 +1134,6 @@ void Application::HandleWakeWordDetectedEvent() {
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
     
-    // Wake up alert look on interaction
     EmoMoodEngine::GetInstance().ResetInteraction("neutral");
    
     if (state == kDeviceStateIdle) {
@@ -1102,6 +1179,7 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
 
     auto& board = Board::GetInstance();
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     if (!protocol_->IsAudioChannelOpened()) {
         if (!protocol_->OpenAudioChannel()) {
@@ -1136,23 +1214,31 @@ void Application::HandleStateChangedEvent() {
     switch (new_state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
-            EmoMoodEngine::GetInstance().SetIdleMode(true); // Resume idle masti loop!
+            EmoMoodEngine::GetInstance().SetIdleMode(true);
+            esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
             if (last_error_message_.empty()) {
-                display->SetStatus(Lang::Strings::STANDBY);
+                ReadLiveBatteryLevel();
+                char status_batt[48];
+                snprintf(status_batt, sizeof(status_batt), "%s %s %d%%",
+                         Lang::Strings::STANDBY,
+                         GetBatteryIconSymbol(s_battery_percent),
+                         s_battery_percent);
+                display->SetStatus(status_batt);
                 display->ClearChatMessages();
                 display->SetEmotion("neutral");
-                ServoController::GetInstance().SetTarget(90.0f, 1.0f);
             }
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
             break;
         case kDeviceStateConnecting:
             EmoMoodEngine::GetInstance().SetIdleMode(false);
+            esp_wifi_set_ps(WIFI_PS_NONE);
             display->SetEmotion("neutral");
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
             EmoMoodEngine::GetInstance().SetIdleMode(false);
+            esp_wifi_set_ps(WIFI_PS_NONE);
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
             ServoController::GetInstance().OnListening();
@@ -1170,6 +1256,7 @@ void Application::HandleStateChangedEvent() {
             break;
         case kDeviceStateSpeaking:
             EmoMoodEngine::GetInstance().SetIdleMode(false);
+            esp_wifi_set_ps(WIFI_PS_NONE);
             display->SetStatus(Lang::Strings::SPEAKING);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(false);
@@ -1178,6 +1265,7 @@ void Application::HandleStateChangedEvent() {
             break;
         case kDeviceStateNotifying:
             EmoMoodEngine::GetInstance().SetIdleMode(false);
+            esp_wifi_set_ps(WIFI_PS_NONE);
             display->SetStatus(Lang::Strings::SPEAKING);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(audio_service_.IsAfeWakeWord());
@@ -1201,8 +1289,6 @@ void Application::ShowStartupWakeWordHint() {
     const auto state = GetDeviceState();
     const bool wake_word_running = audio_service_.IsWakeWordRunning();
     if (state != kDeviceStateIdle || !last_error_message_.empty() || !wake_word_running) {
-        ESP_LOGI(TAG, "Startup wake word hint skipped (state=%d, wake word running=%d, error=%d)",
-                 static_cast<int>(state), wake_word_running, !last_error_message_.empty());
         return;
     }
 
@@ -1218,13 +1304,11 @@ void Application::ShowStartupWakeWordHint() {
         words += *it;
     }
     if (words.empty()) {
-        ESP_LOGW(TAG, "Startup wake word hint skipped: no available wake words");
         return;
     }
     std::string message = Lang::Strings::WAKE_WORD_HINT;
     const auto placeholder = message.find("%s");
     if (placeholder == std::string::npos) {
-        ESP_LOGE(TAG, "Startup wake word hint skipped: invalid message template");
         return;
     }
     message.replace(placeholder, 2, words);
@@ -1242,7 +1326,6 @@ void Application::ShowStartupWakeWordHint() {
         };
         ESP_ERROR_CHECK(esp_timer_create(&timer_args, &startup_wake_word_hint_timer_));
     }
-    ESP_LOGI(TAG, "Startup wake word hint: %s", message.c_str());
     Board::GetInstance().GetDisplay()->SetChatMessage("assistant", message.c_str());
     startup_wake_word_hint_message_ = std::move(message);
     ESP_ERROR_CHECK(esp_timer_start_once(startup_wake_word_hint_timer_, 5000 * 1000));
@@ -1283,12 +1366,12 @@ void Application::ConfigureWakeWordForListening() {
 
 void Application::StartNotification(std::string audio_url, std::vector<NotifySubtitle> subtitles) {
     if (GetDeviceState() != kDeviceStateIdle || notify_player_.IsBusy()) {
-        ESP_LOGW(TAG, "Ignoring notify message while device is busy");
         return;
     }
 
     auto& board = Board::GetInstance();
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+    esp_wifi_set_ps(WIFI_PS_NONE);
     audio_service_.EnableVoiceProcessing(false);
     audio_service_.EnableWakeWordDetection(audio_service_.IsAfeWakeWord());
     audio_service_.ReleaseWakeWordResources();
@@ -1321,7 +1404,6 @@ void Application::StartNotification(std::string audio_url, std::vector<NotifySub
         });
 
     if (!started) {
-        ESP_LOGE(TAG, "Failed to start notification playback");
         StopNotification();
     }
 }
@@ -1332,6 +1414,7 @@ void Application::StopNotification() {
     auto& board = Board::GetInstance();
     board.GetDisplay()->SetChatMessage("assistant", "");
     board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
     if (GetDeviceState() == kDeviceStateNotifying) {
         SetDeviceState(kDeviceStateIdle);
     }
@@ -1341,8 +1424,6 @@ void Application::HandleNotificationFinished(uint32_t playback_id, bool success)
     if (GetDeviceState() != kDeviceStateNotifying || notification_playback_id_ != playback_id) {
         return;
     }
-    ESP_LOGI(TAG, "Notification playback %lu %s", static_cast<unsigned long>(playback_id),
-             success ? "completed" : "failed");
     StopNotification();
 }
 
@@ -1397,10 +1478,8 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
     }
 
     if (protocol_ && protocol_->IsAudioChannelOpened()) {
-        ESP_LOGI(TAG, "Closing audio channel before firmware upgrade");
         protocol_->CloseAudioChannel();
     }
-    ESP_LOGI(TAG, "Starting firmware upgrade from URL: %s", upgrade_url.c_str());
 
     Alert(Lang::Strings::OTA_UPGRADE, Lang::Strings::UPGRADING, "download",
           Lang::Sounds::OGG_UPGRADE);
@@ -1424,8 +1503,6 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
     });
 
     if (!upgrade_success) {
-        ESP_LOGE(TAG,
-                 "Firmware upgrade failed, restarting audio service and continuing operation...");
         audio_service_.Start();
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
         Alert(Lang::Strings::ERROR, Lang::Strings::UPGRADE_FAILED, "cancel",
@@ -1433,7 +1510,6 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
         vTaskDelay(pdMS_TO_TICKS(3000));
         return false;
     } else {
-        ESP_LOGI(TAG, "Firmware upgrade successful, rebooting...");
         display->SetChatMessage("system", "Upgrade successful, rebooting...");
         vTaskDelay(pdMS_TO_TICKS(1000));
         Reboot();
@@ -1476,15 +1552,12 @@ bool Application::CanEnterSleepMode() {
     if (GetDeviceState() != kDeviceStateIdle) {
         return false;
     }
-
     if (protocol_ && protocol_->IsAudioChannelOpened()) {
         return false;
     }
-
     if (!audio_service_.IsIdle()) {
         return false;
     }
-
     return true;
 }
 
