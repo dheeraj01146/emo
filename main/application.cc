@@ -75,13 +75,13 @@ static void ReadLiveBatteryLevel() {
     }
 }
 
-static const char* GetBatteryIconSymbol(int pct) {
-    if (pct >= 85) return "[████]"; // Full Battery
-    if (pct >= 60) return "[███ ]"; // 3/4 Battery
-    if (pct >= 40) return "[██  ]"; // Half Battery
-    if (pct >= 15) return "[█   ]"; // Low Battery
-    return "[    ]";                // Empty / Critical
-}
+//static const char* GetBatteryIconSymbol(int pct) {
+  //  if (pct >= 85) return "[████]"; // Full Battery
+    //if (pct >= 60) return "[███ ]"; // 3/4 Battery
+   // if (pct >= 40) return "[██  ]"; // Half Battery
+    //if (pct >= 15) return "[█   ]"; // Low Battery
+    //return "[    ]";                // Empty / Critical
+//}
 // ================= LIVE BATTERY MONITOR ENGINE END =================
 
 // ================= WEB MQTT BRIDGE & LIVE STATE SYNC START =================
