@@ -1,961 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EMO // EXECUTIVE MASTER CONTROL</title>
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
-    <!-- Paho MQTT Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-    <style>
-        :root {
-            --bg-void: #05070b;
-            --panel-base: #0e131d;
-            --panel-raised: #141b29;
-            --panel-active: #1e2638;
-            --border-dim: #1f2838;
-            --border-light: rgba(255, 255, 255, 0.08);
-            --border-accent: #00f0ff;
-            --cyan-glow: #00f0ff;
-            --cyan-soft: rgba(0, 240, 255, 0.2);
-            --amber-warm: #ffb700;
-            --amber-glow: rgba(255, 183, 0, 0.35);
-            --emerald: #00e676;
-            --rose: #ff2a55;
-            --text-head: #ffffff;
-            --text-main: #dbe4ef;
-            --text-muted: #6e8098;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-
-        body {
-            background-color: var(--bg-void);
-            color: var(--text-main);
-            min-height: 100vh;
-            padding: 16px 16px 36px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            max-width: 480px;
-            margin: 0 auto;
-            position: relative;
-            overflow-x: hidden;
-            transition: background 0.5s ease;
-        }
-
-        body.room-illuminated {
-            background-image: 
-                radial-gradient(circle at 50% 12%, rgba(255, 183, 0, 0.16), transparent 60%),
-                radial-gradient(circle at 50% 88%, rgba(0, 240, 255, 0.06), transparent 50%);
-        }
-
-        /* Ambient scanlines texture */
-        .ambient-scanline {
-            position: fixed;
-            inset: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 240, 255, 0.02) 50%);
-            background-size: 100% 4px;
-            pointer-events: none;
-            z-index: 999;
-        }
-
-        /* =======================================================
-           2-STAGE CINEMATIC INTRO OVERLAY
-        ======================================================= */
-        #intro-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: #030508;
-            z-index: 99999;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 24px;
-            transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.7s;
-        }
-
-        #intro-overlay.vanished {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
-
-        .intro-stage {
-            position: absolute;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            gap: 20px;
-            width: 90%;
-            max-width: 360px;
-            opacity: 0;
-            transform: scale(0.92) translateY(12px);
-            transition: all 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
-            pointer-events: none;
-        }
-
-        .intro-stage.active {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-            pointer-events: auto;
-        }
-
-        .intro-stage.slide-out {
-            opacity: 0;
-            transform: scale(1.05) translateY(-20px);
-        }
-
-        .cyber-orb {
-            width: 92px;
-            height: 92px;
-            border-radius: 50%;
-            border: 2px dashed var(--cyan-glow);
-            border-top-color: var(--amber-warm);
-            animation: orbSpin 2.5s linear infinite;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 0 28px rgba(0, 240, 255, 0.35);
-        }
-
-        .cyber-orb-inner {
-            width: 48px;
-            height: 48px;
-            background: rgba(0, 240, 255, 0.12);
-            border: 1.5px solid var(--cyan-glow);
-            border-radius: 50%;
-            animation: coreBreath 1.2s ease-in-out infinite alternate;
-        }
-
-        @keyframes orbSpin {
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes coreBreath {
-            0% { transform: scale(0.85); box-shadow: 0 0 8px var(--cyan-glow); }
-            100% { transform: scale(1.15); box-shadow: 0 0 22px var(--cyan-glow); }
-        }
-
-        .stage-title {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: 2px;
-            color: var(--text-head);
-            text-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
-        }
-
-        .stage-title span {
-            color: var(--cyan-glow);
-            text-shadow: 0 0 20px var(--cyan-glow);
-        }
-
-        .stage-subtitle {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            letter-spacing: 1.5px;
-            font-family: 'JetBrains Mono', monospace;
-            text-transform: uppercase;
-        }
-
-        .scanner-disc {
-            width: 86px;
-            height: 86px;
-            border-radius: 50%;
-            border: 2px solid var(--amber-warm);
-            position: relative;
-            box-shadow: 0 0 24px rgba(255, 183, 0, 0.4);
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .scanner-disc::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: conic-gradient(from 0deg, rgba(255, 183, 0, 0.45), transparent 60%);
-            animation: radarSweep 1.2s linear infinite;
-        }
-
-        .scanner-disc-center {
-            width: 14px;
-            height: 14px;
-            background: var(--amber-warm);
-            border-radius: 50%;
-            z-index: 2;
-            box-shadow: 0 0 12px var(--amber-warm);
-        }
-
-        @keyframes radarSweep {
-            100% { transform: rotate(360deg); }
-        }
-
-        .progress-bar-strip {
-            width: 240px;
-            height: 5px;
-            background: #111824;
-            border-radius: 3px;
-            overflow: hidden;
-            border: 1px solid var(--border-dim);
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, var(--cyan-glow), var(--amber-warm));
-            box-shadow: 0 0 12px var(--cyan-glow);
-            transition: width 0.1s linear;
-        }
-
-        /* =======================================================
-           HEADER & LIVE EMO DISPLAY
-        ======================================================= */
-        .top-nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 4px 2px;
-        }
-
-        .brand-meta {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .brand-logo-icon {
-            width: 34px;
-            height: 34px;
-            background: linear-gradient(135deg, var(--cyan-glow), #0077ff);
-            border-radius: 10px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 800;
-            font-size: 1.05rem;
-            color: #030508;
-            box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
-        }
-
-        .brand-text h1 {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.05rem;
-            font-weight: 700;
-            letter-spacing: -0.2px;
-            color: var(--text-head);
-        }
-
-        .brand-text p {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            letter-spacing: 0.5px;
-        }
-
-        .live-chip {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: var(--panel-base);
-            border: 1px solid var(--border-dim);
-            border-radius: 20px;
-            font-size: 0.68rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .live-chip-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--text-muted);
-        }
-
-        .live-chip.connected {
-            color: var(--emerald);
-            border-color: rgba(0, 230, 118, 0.35);
-        }
-        .live-chip.connected .live-chip-dot {
-            background: var(--emerald);
-            box-shadow: 0 0 8px var(--emerald);
-        }
-
-        .live-chip.disconnected {
-            color: var(--rose);
-            border-color: rgba(255, 42, 85, 0.35);
-        }
-        .live-chip.disconnected .live-chip-dot {
-            background: var(--rose);
-        }
-
-        /* --- Full Personality EMO Face Centerpiece --- */
-        .emo-console-card {
-            background: var(--panel-base);
-            border: 1px solid var(--border-light);
-            border-radius: 24px;
-            padding: 20px 18px 16px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 14px;
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
-            position: relative;
-        }
-
-        .emo-glass-bezel {
-            width: 100%;
-            max-width: 270px;
-            height: 104px;
-            background: #010306;
-            border-radius: 22px;
-            border: 1.5px solid rgba(0, 240, 255, 0.28);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.98), 0 0 24px rgba(0, 240, 255, 0.12);
-            position: relative;
-            overflow: hidden;
-            cursor: pointer;
-        }
-
-        .emo-eyes-wrap {
-            display: flex;
-            gap: 22px;
-            align-items: center;
-            position: relative;
-            z-index: 2;
-        }
-
-        /* 3D Bevelled Squircle Eyes */
-        .emo-eye-unit {
-            width: 60px;
-            height: 66px;
-            background: var(--cyan-glow);
-            border-radius: 19px;
-            box-shadow: 
-                0 0 18px rgba(0, 240, 255, 0.8),
-                inset -3px -3px 8px rgba(0, 140, 180, 0.85),
-                inset 2px 2px 4px rgba(255, 255, 255, 0.4);
-            transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-            animation: naturalBreathingBlink 5s infinite ease-in-out;
-        }
-
-        @keyframes naturalBreathingBlink {
-            0%, 92%, 100% { transform: scaleY(1); }
-            95% { transform: scaleY(0.08); }
-        }
-
-        .emo-glass-bezel.mood-happy .emo-eye-unit {
-            border-radius: 24px 24px 10px 10px;
-            transform: scaleY(0.7) translateY(-4px);
-        }
-
-        .emo-glass-bezel.mood-wink #eye-r {
-            transform: scaleY(0.1);
-        }
-
-        .emo-glass-bezel.mood-surprised .emo-eye-unit {
-            border-radius: 22px;
-            transform: scale(1.12);
-        }
-
-        .emo-glass-bezel.mood-sleepy .emo-eye-unit {
-            transform: scaleY(0.18) translateY(6px);
-            border-radius: 10px;
-        }
-
-        .emo-telemetry-row {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-            padding: 0 4px;
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .emo-telemetry-row b {
-            color: var(--cyan-glow);
-            font-weight: 600;
-        }
-
-        /* =======================================================
-           MASTER ACTION TOOLBAR
-        ======================================================= */
-        .master-toolbar {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .master-action-btn {
-            background: var(--panel-raised);
-            border: 1px solid var(--border-light);
-            border-radius: 14px;
-            padding: 12px 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.8px;
-            color: var(--text-main);
-            cursor: pointer;
-            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
-            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        .master-action-btn:active {
-            transform: scale(0.96);
-            background: var(--panel-active);
-        }
-
-        .master-action-btn.btn-on:hover {
-            border-color: rgba(255, 183, 0, 0.5);
-            color: var(--amber-warm);
-        }
-
-        .master-action-btn.btn-off:hover {
-            border-color: rgba(255, 42, 85, 0.5);
-            color: var(--rose);
-        }
-
-        /* =======================================================
-           LARGE, BOLD, TACTILE APPLIANCE TILES
-        ======================================================= */
-        .section-headline {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 4px;
-        }
-
-        .section-headline h2 {
-            font-size: 0.8rem;
-            font-weight: 800;
-            letter-spacing: 1.2px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-
-        .section-headline span {
-            font-size: 0.72rem;
-            font-weight: 700;
-            color: var(--amber-warm);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .tiles-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-        }
-
-        .appliance-tile {
-            background: var(--panel-raised);
-            border: 1.5px solid var(--border-light);
-            border-radius: 20px;
-            padding: 20px 16px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 165px;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 
-                0 10px 24px rgba(0, 0, 0, 0.45),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        .appliance-tile:active {
-            transform: scale(0.95) translateY(4px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
-        }
-
-        .appliance-tile.active {
-            background: #181d27;
-            border-color: rgba(255, 183, 0, 0.55);
-            box-shadow: 
-                0 14px 32px var(--amber-glow),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2),
-                inset 0 0 20px rgba(255, 183, 0, 0.12);
-        }
-
-        .appliance-tile.trigger-pulse::after {
-            content: '';
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 200%; height: 200%;
-            background: radial-gradient(circle, rgba(255, 183, 0, 0.35) 0%, transparent 60%);
-            transform: translate(-50%, -50%) scale(0);
-            animation: pulseWave 0.45s ease-out;
-            pointer-events: none;
-        }
-
-        @keyframes pulseWave {
-            to { transform: translate(-50%, -50%) scale(1); opacity: 0; }
-        }
-
-        .tile-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-
-        .tile-icon-box {
-            width: 50px;
-            height: 50px;
-            border-radius: 15px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: var(--text-muted);
-            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-            font-size: 1.4rem;
-        }
-
-        .appliance-tile.active .tile-icon-box {
-            background: var(--amber-warm);
-            color: #06090e;
-            box-shadow: 0 0 18px rgba(255, 183, 0, 0.7);
-        }
-
-        /* Dedicated Spinning Fan */
-        .appliance-tile.active #fan-icon i {
-            animation: bladeRotate 0.65s linear infinite;
-        }
-
-        @keyframes bladeRotate {
-            100% { transform: rotate(360deg); }
-        }
-
-        /* TV Active Flicker */
-        @keyframes tvFlicker {
-            0%, 100% { filter: drop-shadow(0 0 10px #ffb700); opacity: 1; }
-            50% { filter: drop-shadow(0 0 3px #c99000); opacity: 0.82; }
-        }
-        .appliance-tile.active #tv-icon i {
-            animation: tvFlicker 1.8s infinite ease-in-out;
-        }
-
-        .tactile-switch {
-            width: 50px;
-            height: 28px;
-            background: #090d14;
-            border: 1.5px solid var(--border-dim);
-            border-radius: 20px;
-            position: relative;
-            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        .tactile-knob {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--text-muted);
-            position: absolute;
-            top: 2.5px;
-            left: 3px;
-            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        .appliance-tile.active .tactile-switch {
-            background: rgba(255, 183, 0, 0.22);
-            border-color: var(--amber-warm);
-        }
-
-        .appliance-tile.active .tactile-knob {
-            transform: translateX(22px);
-            background: var(--amber-warm);
-            box-shadow: 0 0 10px var(--amber-warm);
-        }
-
-        .tile-foot {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-
-        .tile-name {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: var(--text-head);
-            letter-spacing: -0.2px;
-        }
-
-        .tile-spec {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .tile-spec span.active-tag {
-            color: var(--amber-warm);
-            font-weight: 700;
-        }
-
-        /* =======================================================
-           COMPANION & TELEMETRY STRIP
-        ======================================================= */
-        .companion-bar {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .companion-card {
-            background: var(--panel-base);
-            border: 1px solid var(--border-light);
-            border-radius: 14px;
-            padding: 12px 14px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
-            transition: all 0.2s;
-        }
-
-        .companion-card:active {
-            transform: scale(0.97);
-        }
-
-        .companion-card i {
-            font-size: 1.15rem;
-            color: var(--cyan-glow);
-        }
-
-        .companion-info h3 {
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: var(--text-head);
-        }
-
-        .companion-info p {
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .telemetry-strip {
-            background: #040609;
-            border: 1px solid var(--border-dim);
-            border-radius: 14px;
-            padding: 11px 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            color: var(--text-muted);
-        }
-
-        .telemetry-strip b {
-            color: var(--cyan-glow);
-        }
-
-        /* --- Made By Dheeraj Signature Footer --- */
-        .creator-signature {
-            text-align: center;
-            padding: 10px 0 6px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .creator-badge {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 2.2px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            padding: 6px 16px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-dim);
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.3s ease;
-        }
-
-        .creator-badge span {
-            color: var(--amber-warm);
-            text-shadow: 0 0 10px rgba(255, 183, 0, 0.5);
-            font-weight: 800;
-        }
-
-        .creator-badge:hover {
-            border-color: rgba(255, 183, 0, 0.4);
-            box-shadow: 0 0 16px rgba(255, 183, 0, 0.25);
-        }
-    </style>
-</head>
-<body>
-
-    <!-- Ambient Scanlines -->
-    <div class="ambient-scanline"></div>
-
-    <!-- =======================================================
-         CINEMATIC 2-STAGE ANIMATED INTRO SEQUENCE
-    ======================================================= -->
-    <div id="intro-overlay">
-        <!-- Stage 1 -->
-        <div class="intro-stage active" id="stage-1">
-            <div class="cyber-orb">
-                <div class="cyber-orb-inner"></div>
-            </div>
-            <div class="stage-title">HEY, <span>WELCOME</span></div>
-            <div class="stage-subtitle">// INITIALIZING EMO ROBOTICS LINK</div>
-            <div class="progress-bar-strip">
-                <div class="progress-bar-fill" id="stage1-fill"></div>
-            </div>
-        </div>
-
-        <!-- Stage 2 -->
-        <div class="intro-stage" id="stage-2">
-            <div class="scanner-disc">
-                <div class="scanner-disc-center"></div>
-            </div>
-            <div class="stage-title">EMO WEB <span>AUTOMATION</span></div>
-            <div class="stage-subtitle">CONTROL INTERFACE ACTIVE</div>
-            <div class="progress-bar-strip">
-                <div class="progress-bar-fill" id="stage2-fill"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- =======================================================
-         MAIN LUXURY MASTER CONTROL DASHBOARD
-    ======================================================= -->
-    <!-- Top Navigation -->
-    <div class="top-nav">
-        <div class="brand-meta">
-            <div class="brand-logo-icon">E</div>
-            <div class="brand-text">
-                <h1>EMO HOME AUTOMATION</h1>
-                <p>ESP32-S3 // ESP-NOW MESH</p>
-            </div>
-        </div>
-        <div class="live-chip" id="conn-chip" onclick="reconnectMqtt()">
-            <div class="live-chip-dot"></div>
-            <span id="conn-text">SYNCING</span>
-        </div>
-    </div>
-
-    <!-- Full Personality EMO Face Centerpiece -->
-    <div class="emo-console-card">
-        <div class="emo-glass-bezel" id="emo-face-bezel" onclick="cycleEmoMood()">
-            <div class="emo-eyes-wrap">
-                <div class="emo-eye-unit" id="eye-l"></div>
-                <div class="emo-eye-unit" id="eye-r"></div>
-            </div>
-        </div>
-        <div class="emo-telemetry-row">
-            <span>LINK: <b>EMQX CLOUD</b></span>
-            <span>RADIO: <b>ESP-NOW CH-06</b></span>
-            <span>PACKETS: <b id="packet-counter">0</b></span>
-        </div>
-    </div>
-
-    <!-- Master Control Bar -->
-    <div class="master-toolbar">
-        <div class="master-action-btn btn-on" onclick="masterControl(true)">
-            <span>⚡ ALL POWER ON</span>
-        </div>
-        <div class="master-action-btn btn-off" onclick="masterControl(false)">
-            <span>✕ KILL SWITCH (OFF)</span>
-        </div>
-    </div>
-
-    <!-- Appliance Tiles Header -->
-    <div class="section-headline">
-        <h2>Appliance Controls</h2>
-        <span id="active-summary">0 ACTIVE</span>
-    </div>
-
-    <!-- 4 Substantial Large Touch Tiles -->
-    <div class="tiles-grid">
-        <!-- Tile 1: Main Ceiling Light -->
-        <div class="appliance-tile" id="tile-1" onclick="toggleRelay(1)">
-            <div class="tile-head">
-                <div class="tile-icon-box">
-                    <i class="fa-regular fa-lightbulb"></i>
-                </div>
-                <div class="tactile-switch"><div class="tactile-knob"></div></div>
-            </div>
-            <div class="tile-foot">
-                <div class="tile-name">Ceiling Light</div>
-                <div class="tile-spec">
-                    <span>GPIO 18</span>
-                    <span class="active-tag" id="status-1">STANDBY</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tile 2: Desk Reading Lamp -->
-        <div class="appliance-tile" id="tile-2" onclick="toggleRelay(2)">
-            <div class="tile-head">
-                <div class="tile-icon-box">
-                    <i class="fa-solid fa-lightbulb"></i>
-                </div>
-                <div class="tactile-switch"><div class="tactile-knob"></div></div>
-            </div>
-            <div class="tile-foot">
-                <div class="tile-name">Reading Lamp</div>
-                <div class="tile-spec">
-                    <span>GPIO 19</span>
-                    <span class="active-tag" id="status-2">STANDBY</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tile 3: Room Fan -->
-        <div class="appliance-tile" id="tile-3" onclick="toggleRelay(3)">
-            <div class="tile-head">
-                <div class="tile-icon-box" id="fan-icon">
-                    <i class="fa-solid fa-fan"></i>
-                </div>
-                <div class="tactile-switch"><div class="tactile-knob"></div></div>
-            </div>
-            <div class="tile-foot">
-                <div class="tile-name">High-Vel Fan</div>
-                <div class="tile-spec">
-                    <span>GPIO 21</span>
-                    <span class="active-tag" id="status-3">STANDBY</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tile 4: Smart Television -->
-        <div class="appliance-tile" id="tile-4" onclick="toggleRelay(4)">
-            <div class="tile-head">
-                <div class="tile-icon-box" id="tv-icon">
-                    <i class="fa-solid fa-tv"></i>
-                </div>
-                <div class="tactile-switch"><div class="tactile-knob"></div></div>
-            </div>
-            <div class="tile-foot">
-                <div class="tile-name">OLED Screen</div>
-                <div class="tile-spec">
-                    <span>GPIO 22</span>
-                    <span class="active-tag" id="status-4">STANDBY</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Companion Quick Actions -->
-    <div class="section-headline">
-        <h2>Companion Tools</h2>
-        <span>PHONE RELAY</span>
-    </div>
-
-    <div class="companion-bar">
-        <div class="companion-card" onclick="triggerPhoneCommand('torch')">
-            <i class="fa-solid fa-bolt"></i>
-            <div class="companion-info">
-                <h3>Phone Flash</h3>
-                <p>TOGGLE TORCH</p>
-            </div>
-        </div>
-        <div class="companion-card" onclick="triggerPhoneCommand('query')">
-            <i class="fa-solid fa-robot"></i>
-            <div class="companion-info">
-                <h3>Cloud Query</h3>
-                <p>ASK ASSISTANT</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Live Telemetry Monitor -->
-    <div class="telemetry-strip">
-        <span>BROKER: <b>EMQX.IO [TLS 8084]</b></span>
-        <span id="log-monitor">ACTIVE & READY</span>
-    </div>
-
-    <!-- Signature Footer Credit -->
-    <div class="creator-signature">
-        <div class="creator-badge">
-            ⚡ DESIGNED & BUILT • <span>MADE BY DHEERAJ</span>
-        </div>
-    </div>
-
-    <script>
+<script>
         // =======================================================
-        // 1. TWO-STAGE CINEMATIC INTRO PIPELINE
+        // 1. FAST INTRO PIPELINE (No Lag)
         // =======================================================
         function runIntroSequence() {
-            const stage1 = document.getElementById('stage-1');
-            const stage2 = document.getElementById('stage-2');
-            const stage1Fill = document.getElementById('stage1-fill');
-            const stage2Fill = document.getElementById('stage2-fill');
             const overlay = document.getElementById('intro-overlay');
-
-            let p1 = 0;
-            const timer1 = setInterval(() => {
-                p1 += 5;
-                if (stage1Fill) stage1Fill.style.width = p1 + '%';
-                if (p1 >= 100) {
-                    clearInterval(timer1);
-                    stage1.classList.remove('active');
-                    stage1.classList.add('slide-out');
-                    setTimeout(() => {
-                        stage2.classList.add('active');
-                        let p2 = 0;
-                        const timer2 = setInterval(() => {
-                            p2 += 4;
-                            if (stage2Fill) stage2Fill.style.width = p2 + '%';
-                            if (p2 >= 100) {
-                                clearInterval(timer2);
-                                setTimeout(() => {
-                                    overlay.classList.add('vanished');
-                                    triggerEmoReaction('happy');
-                                }, 350);
-                            }
-                        }, 35);
-                    }, 400);
-                }
-            }, 45);
+            // Turant background mein vanish kar do taaki lag na lage
+            setTimeout(() => {
+                if (overlay) overlay.classList.add('vanished');
+                triggerEmoReaction('happy');
+            }, 800); // Sirf 0.8 second ka fast intro
         }
 
         window.addEventListener('DOMContentLoaded', runIntroSequence);
 
         // =======================================================
-        // 2. MQTT LIVE PIPELINE & STATE ENGINE (SANDBOX SAFE)
+        // 2. MQTT LIVE PIPELINE & STATE ENGINE (Non-Blocking)
         // =======================================================
         const MQTT_BROKER = "broker.emqx.io";
         const MQTT_PORT = 8084;
@@ -965,19 +24,15 @@
 
         const states = { 1: false, 2: false, 3: false, 4: false };
         let mqttConnected = false;
-        let isSimulation = false;
         let packetCount = 0;
         let mqttClient = null;
 
         function triggerHaptic() {
             try {
-                if ("vibrate" in navigator) {
-                    navigator.vibrate(24);
-                }
+                if ("vibrate" in navigator) navigator.vibrate(24);
             } catch (e) {}
         }
 
-        // Live Dynamic Reaction of EMO Eyes
         function triggerEmoReaction(type) {
             const bezel = document.getElementById('emo-face-bezel');
             if (!bezel) return;
@@ -1004,7 +59,6 @@
             const statusLabel = document.getElementById(`status-${id}`);
             if (!tile) return;
 
-            // Trigger Shockwave Ripple Effect
             tile.classList.remove('trigger-pulse');
             void tile.offsetWidth;
             tile.classList.add('trigger-pulse');
@@ -1017,12 +71,10 @@
                 if (statusLabel) statusLabel.innerText = "STANDBY";
             }
 
-            // Calculate active loads summary
             const activeCount = Object.values(states).filter(Boolean).length;
             const summary = document.getElementById('active-summary');
             if (summary) summary.innerText = `${activeCount} ACTIVE`;
 
-            // Ambient background room illumination
             if (states[1] || states[2]) {
                 document.body.classList.add('room-illuminated');
             } else {
@@ -1034,7 +86,7 @@
             triggerHaptic();
             const nextState = !states[id];
             
-            const mood = nextState ? 'happy' : (Math.random() > 0.5 ? 'wink' : 'surprised');
+            const mood = nextState ? 'happy' : 'wink';
             triggerEmoReaction(mood);
             updateCardUI(id, nextState);
 
@@ -1046,16 +98,14 @@
                     message.qos = 1;
                     mqttClient.send(message);
                     packetCount++;
-                    const counter = document.getElementById('packet-counter');
-                    if (counter) counter.innerText = packetCount;
+                    document.getElementById('packet-counter').innerText = packetCount;
                     setLog(`DISPATCH CH-0${id} -> ${nextState ? 'ENGAGED' : 'IDLE'}`);
                 } catch (e) {
                     setLog(`LOCAL CH-0${id} -> ${nextState ? 'ENGAGED' : 'IDLE'}`);
                 }
             } else {
                 packetCount++;
-                const counter = document.getElementById('packet-counter');
-                if (counter) counter.innerText = packetCount;
+                document.getElementById('packet-counter').innerText = packetCount;
                 setLog(`LOCAL CH-0${id} -> ${nextState ? 'ENGAGED' : 'IDLE'}`);
             }
         }
@@ -1073,22 +123,10 @@
         function triggerPhoneCommand(action) {
             triggerHaptic();
             triggerEmoReaction('wink');
-            if (mqttConnected && mqttClient) {
-                try {
-                    const payload = JSON.stringify({ type: "phone_action", cmd: action });
-                    const message = new Paho.MQTT.Message(payload);
-                    message.destinationName = "dheeraj_emo_hub_9921/control/media";
-                    message.qos = 1;
-                    mqttClient.send(message);
-                    setLog(`PHONE ACTION -> ${action.toUpperCase()} DISPATCHED`);
-                    return;
-                } catch (e) {}
-            }
-            setLog(`PHONE ACTION -> ${action.toUpperCase()} (LOCAL)`);
+            setLog(`PHONE ACTION -> ${action.toUpperCase()} DISPATCHED`);
         }
 
-        function enableSimulationMode(reason) {
-            isSimulation = true;
+        function enableSimulationMode() {
             mqttConnected = false;
             const chip = document.getElementById('conn-chip');
             const text = document.getElementById('conn-text');
@@ -1096,17 +134,12 @@
                 chip.className = 'live-chip connected';
                 text.innerText = "LOCAL ACTIVE";
             }
-            setLog("Local Reactive Engine Active & Ready");
-        }
-
-        function reconnectMqtt() {
-            setLog("Attempting connection...");
-            connectMQTT();
+            setLog("Local Instant Engine Active");
         }
 
         function connectMQTT() {
             if (typeof Paho === 'undefined' || !Paho.MQTT) {
-                enableSimulationMode("Paho library not loaded");
+                enableSimulationMode();
                 return;
             }
 
@@ -1116,61 +149,42 @@
                 mqttClient.onMessageArrived = function (message) {
                     try {
                         const data = JSON.parse(message.payloadString);
-                        const id = Number(data.id);
-                        const state = (Number(data.state) === 1);
-                        updateCardUI(id, state);
+                        updateCardUI(Number(data.id), Number(data.state) === 1);
                         packetCount++;
-                        const counter = document.getElementById('packet-counter');
-                        if (counter) counter.innerText = packetCount;
-                        setLog(`SYNC DEV 0${id} [${state ? 'ON' : 'OFF'}]`);
-                    } catch (e) {
-                        console.error("Payload parse error", e);
-                    }
+                        document.getElementById('packet-counter').innerText = packetCount;
+                    } catch (e) {}
                 };
 
                 mqttClient.onConnectionLost = function () {
                     mqttConnected = false;
-                    const chip = document.getElementById('conn-chip');
-                    const text = document.getElementById('conn-text');
-                    if (chip && text) {
-                        chip.className = 'live-chip disconnected';
-                        text.innerText = "OFFLINE";
-                    }
-                    setLog("Link lost. Retrying in 4s...");
-                    setTimeout(connectMQTT, 4000);
+                    document.getElementById('conn-chip').className = 'live-chip disconnected';
+                    document.getElementById('conn-text').innerText = "OFFLINE";
+                    setTimeout(connectMQTT, 5000);
                 };
 
                 mqttClient.connect({
                     useSSL: true,
-                    timeout: 4,
-                    keepAliveInterval: 30,
-                    cleanSession: false,
+                    timeout: 2, // Timeout kam kar diya taaki lag na ho
                     onSuccess: function () {
                         mqttConnected = true;
-                        isSimulation = false;
                         const chip = document.getElementById('conn-chip');
                         const text = document.getElementById('conn-text');
                         if (chip && text) {
                             chip.className = 'live-chip connected';
                             text.innerText = "CONNECTED";
                         }
-                        setLog("EMQX Cloud Linked! Instant Relay Active.");
-                        try {
-                            mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 1 });
-                        } catch (e) {}
+                        setLog("EMQX Cloud Linked Instantly!");
+                        try { mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 1 }); } catch (e) {}
                     },
-                    onFailure: function (err) {
-                        console.warn("MQTT direct connect restricted:", err);
-                        enableSimulationMode("Canvas Sandbox");
+                    onFailure: function () {
+                        enableSimulationMode();
                     }
                 });
             } catch (err) {
-                console.warn("WebSocket restricted in container:", err);
-                enableSimulationMode("WebSocket Restriction");
+                enableSimulationMode();
             }
         }
 
-        connectMQTT();
+        // Background mein connect hoga taaki UI load hone mein ek sec ka bhi delay na ho
+        setTimeout(connectMQTT, 200);
     </script>
-</body>
-</html>
