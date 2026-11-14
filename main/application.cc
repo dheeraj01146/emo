@@ -826,7 +826,12 @@ void Application::InitializeProtocol() {
                     if (GetDeviceState() == kDeviceStateSpeaking) {
                         if (audio_service_.IsPlaybackIdle()) {
                             s_tts_stop_pending = false;
-                            SetDeviceState(kDeviceStateIdle);
+
+                            if aec_mode_ != KAecOFF) {
+                                StartListening();
+                            } else {
+                                SetDeviceState(kDeviceStateIdle);
+                            }
                         } else {
                             s_tts_stop_pending = true;
                         }
