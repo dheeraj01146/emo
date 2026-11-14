@@ -39,7 +39,7 @@
 
 #define OPUS_FRAME_DURATION_MS 60
 #define MAX_ENCODE_TASKS_IN_QUEUE 2
-#define MAX_PLAYBACK_TASKS_IN_QUEUE 2
+#define MAX_PLAYBACK_TASKS_IN_QUEUE 10
 #define MAX_DECODE_PACKETS_IN_QUEUE (2400 / OPUS_FRAME_DURATION_MS)
 #define MAX_SEND_PACKETS_IN_QUEUE (2400 / OPUS_FRAME_DURATION_MS)
 #define AUDIO_TESTING_MAX_DURATION_MS 10000
@@ -73,7 +73,7 @@
         .frame_duration =                                                                      \
             (esp_opus_enc_frame_duration_t)AS_OPUS_GET_FRAME_DRU_ENUM(OPUS_FRAME_DURATION_MS), \
         .application_mode = ESP_OPUS_ENC_APPLICATION_AUDIO,                                    \
-        .complexity = 0,                                                                       \
+        .complexity = 2,                                                                       \
         .enable_fec = false,                                                                   \
         .enable_dtx = true,                                                                    \
         .enable_vbr = true,                                                                    \
