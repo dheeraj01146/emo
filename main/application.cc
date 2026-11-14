@@ -1172,7 +1172,7 @@ void Application::HandleStateChangedEvent() {
             display->SetStatus(Lang::Strings::SPEAKING);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(false);
-            board.GetAudioCodec()->EnableInput(false);
+         //   board.GetAudioCodec()->EnableInput(false);
             // Note: ResetDecoder() is already called at tts->start before packets arrive
             break;
         case kDeviceStateNotifying:
