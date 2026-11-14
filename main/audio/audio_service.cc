@@ -2,19 +2,19 @@
 #include <esp_log.h>
 #include <cstring>
 
-#define RATE_CVT_CFG(_src_rate, _dest_rate, _channel)                                        \
-    (esp_ae_rate_cvt_cfg_t) {                                                                \
-        .src_rate = (uint32_t)(_src_rate), .dest_rate = (uint32_t)(_dest_rate),              \
-        .channel = (uint8_t)(_channel), .bits_per_sample = ESP_AUDIO_BIT16, .complexity = 2, \
-        .perf_type = ESP_AE_RATE_CVT_PERF_TYPE_SPEED,                                        \
+#define RATE_CVT_CFG(_src_rate, _dest_rate, _channel)                                               \
+    (esp_ae_rate_cvt_cfg_t) {                                                                       \
+        .src_rate = (uint32_t)(_src_rate), .dest_rate = (uint32_t)(_dest_rate),                     \
+        .channel = (uint8_t)(_channel), .bits_per_sample = ESP_AUDIO_BIT16, .complexity = 2,        \
+        .perf_type = ESP_AE_RATE_CVT_PERF_TYPE_SPEED,                                               \
     }
 
-#define OPUS_DEC_CFG(_sample_rate, _frame_duration_ms)                                     \
-    (esp_opus_dec_cfg_t) {                                                                 \
-        .sample_rate = (uint32_t)(_sample_rate), .channel = ESP_AUDIO_MONO,                \
-        .frame_duration =                                                                  \
-            (esp_opus_dec_frame_duration_t)AS_OPUS_GET_FRAME_DRU_ENUM(_frame_duration_ms), \
-        .self_delimited = false,                                                           \
+#define OPUS_DEC_CFG(_sample_rate, _frame_duration_ms)                                             \
+    (esp_opus_dec_cfg_t) {                                                                         \
+        .sample_rate = (uint32_t)(_sample_rate), .channel = ESP_AUDIO_MONO,                        \
+        .frame_duration =                                                                          \
+            (esp_opus_dec_frame_duration_t)AS_OPUS_GET_FRAME_DRU_ENUM(_frame_duration_ms),         \
+        .self_delimited = false,                                                                   \
     }
 
 #if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4 || CONFIG_IDF_TARGET_ESP32S31
@@ -117,8 +117,8 @@ void AudioService::Initialize(AudioCodec* codec) {
 void AudioService::Start() {
     service_stopped_.store(false);
     xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING |
-                                           AS_EVENT_AUDIO_PROCESSOR_RUNNING |
-                                           AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
+                                       AS_EVENT_AUDIO_PROCESSOR_RUNNING |
+                                       AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
 
     esp_timer_start_periodic(audio_power_timer_, 1000000);
 
@@ -160,21 +160,21 @@ void AudioService::Start() {
         "audio_output", 2048, this, 4, &audio_output_task_handle_);
 #endif
 
-    /* Start the opus codec task */
+    /* Start the opus codec task with high priority 5 to prevent audio lagging */
     xTaskCreate(
         [](void* arg) {
             AudioService* audio_service = (AudioService*)arg;
             audio_service->OpusCodecTask();
             vTaskDelete(NULL);
         },
-        "opus_codec", 2048 * 12, this, 2, &opus_codec_task_handle_);
+        "opus_codec", 2048 * 12, this, 5, &opus_codec_task_handle_);
 }
 
 void AudioService::Stop() {
     esp_timer_stop(audio_power_timer_);
     service_stopped_.store(true);
     xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING |
-                                         AS_EVENT_AUDIO_PROCESSOR_RUNNING);
+                                     AS_EVENT_AUDIO_PROCESSOR_RUNNING);
 
     bool notify_drained = false;
     {
@@ -229,7 +229,6 @@ bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, in
     debug_statistics_.input_count++;
 
 #if CONFIG_USE_AUDIO_DEBUGGER
-    // 音频调试：发送原始音频数据
     if (audio_debugger_ == nullptr) {
         audio_debugger_ = std::make_unique<AudioDebugger>();
     }
@@ -250,8 +249,6 @@ void AudioService::AudioInputTask() {
             pdFALSE, portMAX_DELAY);
 
         if (service_stopped_.load()) {
-            // ADC continuous mode keeps its hardware mutex from start until stop,
-            // so the input task that started it must also stop it before exiting.
             if (codec_->input_enabled()) {
                 codec_->EnableInput(false);
             }
@@ -260,15 +257,11 @@ void AudioService::AudioInputTask() {
 
         if (bits & AS_EVENT_AUDIO_INPUT_STOP_REQUEST) {
             xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
-
-            // Recheck the active state in this task. Audio capture may have been
-            // enabled after the timer posted the stop request.
             bits = xEventGroupGetBits(event_group_);
             if ((bits & kAudioInputActiveBits) == 0) {
                 if (codec_->input_enabled()) {
                     codec_->EnableInput(false);
                 }
-                // Do not process the stale active bits returned by waitBits().
                 continue;
             }
         }
@@ -278,7 +271,6 @@ void AudioService::AudioInputTask() {
             continue;
         }
 
-        /* Used for audio testing in NetworkConfiguring mode by clicking the BOOT button */
         if (bits & AS_EVENT_AUDIO_TESTING_RUNNING) {
             bool testing_queue_full = false;
             {
@@ -293,7 +285,6 @@ void AudioService::AudioInputTask() {
             std::vector<int16_t> data;
             int samples = OPUS_FRAME_DURATION_MS * 16000 / 1000;
             if (ReadAudioData(data, 16000, samples)) {
-                // If input channels is 2, we need to fetch the left channel data
                 if (codec_->input_channels() == 2) {
                     auto mono_data = std::vector<int16_t>(data.size() / 2);
                     for (size_t i = 0, j = 0; i < mono_data.size(); ++i, j += 2) {
@@ -306,7 +297,6 @@ void AudioService::AudioInputTask() {
             }
         }
 
-        /* Feed the selected audio engine */
         if (bits & (AS_EVENT_WAKE_WORD_RUNNING | AS_EVENT_AUDIO_PROCESSOR_RUNNING)) {
             int samples = 160;  // 10ms
             std::vector<int16_t> data;
@@ -316,7 +306,6 @@ void AudioService::AudioInputTask() {
             }
         }
 
-        // Read timeout/error should not terminate the input task.
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
@@ -350,14 +339,12 @@ void AudioService::AudioOutputTask() {
 
         codec_->OutputData(task.pcm);
 
-        /* Update the last output time */
         last_output_time_ = std::chrono::steady_clock::now();
         debug_statistics_.playback_count++;
 
         bool notify_drained = false;
         lock.lock();
 #if CONFIG_USE_SERVER_AEC
-        /* Record the timestamp for server AEC */
         if (task.timestamp > 0) {
             if (timestamp_queue_.full()) {
                 timestamp_queue_.pop_front();
@@ -390,7 +377,6 @@ void AudioService::OpusCodecTask() {
             break;
         }
 
-        /* Decode the audio from decode queue */
         if (!audio_decode_queue_.empty() &&
             audio_playback_queue_.size() < MAX_PLAYBACK_TASKS_IN_QUEUE) {
             auto packet = std::move(audio_decode_queue_.front());
@@ -462,7 +448,7 @@ void AudioService::OpusCodecTask() {
             }
             lock.lock();
         }
-        /* Encode the audio to send queue */
+
         if (!audio_encode_queue_.empty()) {
             auto task = std::move(audio_encode_queue_.front());
             audio_encode_queue_.pop_front();
@@ -492,8 +478,6 @@ void AudioService::OpusCodecTask() {
                     if (task.type == kAudioTaskTypeEncodeToSendQueue) {
                         {
                             std::lock_guard<std::mutex> lock2(audio_queue_mutex_);
-                            /* Never let a full send queue stall encoding: stale realtime
-                             * audio is useless to the server, so drop the oldest packet. */
                             if (audio_send_queue_.size() >= MAX_SEND_PACKETS_IN_QUEUE) {
                                 audio_send_queue_.pop_front();
                             }
@@ -517,10 +501,7 @@ void AudioService::OpusCodecTask() {
                     ESP_LOGE(TAG, "Failed to encode audio, error code: %d", ret);
                 }
             } else {
-                ESP_LOGE(TAG,
-                         "Failed to encode audio: encoder not configured or invalid frame size "
-                         "(got %u, expected %u)",
-                         task.pcm.size(), encoder_frame_size_);
+                ESP_LOGE(TAG, "Failed to encode audio: encoder not configured or invalid frame size");
             }
             lock.lock();
         }
@@ -573,19 +554,13 @@ void AudioService::PushTaskToEncodeQueue(AudioTaskType type, std::vector<int16_t
 
     uint32_t dropped_total = 0;
     {
-        /* Push the task to the encode queue */
         std::unique_lock<std::mutex> lock(audio_queue_mutex_);
 
-        /* If the task is to send queue, we need to set the timestamp */
         if (type == kAudioTaskTypeEncodeToSendQueue && !timestamp_queue_.empty()) {
             task.timestamp = timestamp_queue_.front();
             timestamp_queue_.pop_front();
         }
 
-        /* Microphone audio is realtime, so drop the oldest frame instead of blocking.
-         * Blocking here would stall the audio engine task (AFE fetch) and deadlock the
-         * whole input pipeline when the send queue stops being drained (e.g. network
-         * congestion or a failed UDP send). */
         if (audio_encode_queue_.size() >= MAX_ENCODE_TASKS_IN_QUEUE) {
             audio_encode_queue_.pop_front();
             dropped_total = ++debug_statistics_.encode_drop_count;
@@ -594,8 +569,6 @@ void AudioService::PushTaskToEncodeQueue(AudioTaskType type, std::vector<int16_t
         audio_queue_cv_.notify_all();
     }
 
-    /* Log outside the lock (UART writes are slow and would starve the codec task),
-     * at most once per second. */
     if (dropped_total > 0) {
         int64_t now = esp_timer_get_time();
         if (now - last_encode_drop_log_time_ >= 1000000) {
@@ -609,16 +582,12 @@ void AudioService::PushTaskToEncodeQueue(AudioTaskType type, std::vector<int16_t
 bool AudioService::PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> packet, bool wait) {
     std::unique_lock<std::mutex> lock(audio_queue_mutex_);
     const uint32_t generation = playback_generation_;
+    
+    // Jad se fix: Agar queue full ho jaye, toh purana fasa hua packet turant drop karo taaki live audio na ruke
     if (audio_decode_queue_.size() >= MAX_DECODE_PACKETS_IN_QUEUE) {
-        if (wait) {
-            audio_queue_cv_.wait(lock, [this, generation]() {
-                return service_stopped_.load() || generation != playback_generation_ ||
-                       audio_decode_queue_.size() < MAX_DECODE_PACKETS_IN_QUEUE;
-            });
-        } else {
-            return false;
-        }
+        audio_decode_queue_.pop_front();
     }
+    
     if (service_stopped_.load() || generation != playback_generation_) {
         return false;
     }
@@ -741,7 +710,6 @@ void AudioService::EnableAudioTesting(bool enable) {
         xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING);
     } else {
         xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING);
-        /* Copy audio_testing_queue_ to audio_decode_queue_ */
         std::lock_guard<std::mutex> lock(audio_queue_mutex_);
         audio_decode_queue_.clear();
         audio_decode_queue_.swap(audio_testing_queue_);
@@ -841,12 +809,9 @@ void AudioService::CheckAndUpdateAudioPowerState() {
     auto output_elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(now - last_output_time_).count();
     if (input_elapsed > AUDIO_POWER_TIMEOUT_MS && codec_->input_enabled()) {
-        // ADC continuous start/stop must run in the same task. Wake the audio
-        // input task instead of closing the codec from the esp_timer task.
         xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
     }
     if (output_elapsed > AUDIO_POWER_TIMEOUT_MS && codec_->output_enabled()) {
-        // Keep TX clock when duplex RX is active; otherwise RX may stall on some boards.
         if (!(codec_->duplex() && codec_->input_enabled())) {
             codec_->EnableOutput(false);
         }
