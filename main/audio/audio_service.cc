@@ -2,11 +2,11 @@
 #include <esp_log.h>
 #include <cstring>
 
-#define RATE_CVT_CFG(_src_rate, _dest_rate, _channel)                                               \
-    (esp_ae_rate_cvt_cfg_t) {                                                                       \
-        .src_rate = (uint32_t)(_src_rate), .dest_rate = (uint32_t)(_dest_rate),                     \
-        .channel = (uint8_t)(_channel), .bits_per_sample = ESP_AUDIO_BIT16, .complexity = 2,        \
-        .perf_type = ESP_AE_RATE_CVT_PERF_TYPE_SPEED,                                               \
+#define RATE_CVT_CFG(_src_rate, _dest_rate, _channel)                                              \
+    (esp_ae_rate_cvt_cfg_t) {                                                                      \
+        .src_rate = (uint32_t)(_src_rate), .dest_rate = (uint32_t)(_dest_rate),                    \
+        .channel = (uint8_t)(_channel), .bits_per_sample = ESP_AUDIO_BIT16, .complexity = 2,       \
+        .perf_type = ESP_AE_RATE_CVT_PERF_TYPE_SPEED,                                              \
     }
 
 #define OPUS_DEC_CFG(_sample_rate, _frame_duration_ms)                                             \
@@ -117,13 +117,12 @@ void AudioService::Initialize(AudioCodec* codec) {
 void AudioService::Start() {
     service_stopped_.store(false);
     xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING |
-                                       AS_EVENT_AUDIO_PROCESSOR_RUNNING |
-                                       AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
+                                           AS_EVENT_AUDIO_PROCESSOR_RUNNING |
+                                           AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
 
     esp_timer_start_periodic(audio_power_timer_, 1000000);
 
-#if CONFIG_USE_AUDIO_PROCESSOR
-    /* Start the audio input task */
+    /* Start the audio input task on Core 0 */
     xTaskCreatePinnedToCore(
         [](void* arg) {
             AudioService* audio_service = (AudioService*)arg;
@@ -132,49 +131,30 @@ void AudioService::Start() {
         },
         "audio_input", 2048 * 3, this, 8, &audio_input_task_handle_, 0);
 
-    /* Start the audio output task */
-    xTaskCreate(
+    /* Start the audio output task on Core 1 with high priority (7) for stutter-free I2S DMA feed */
+    xTaskCreatePinnedToCore(
         [](void* arg) {
             AudioService* audio_service = (AudioService*)arg;
             audio_service->AudioOutputTask();
             vTaskDelete(NULL);
         },
-        "audio_output", 2048 * 2, this, 4, &audio_output_task_handle_);
-#else
-    /* Start the audio input task */
-    xTaskCreate(
-        [](void* arg) {
-            AudioService* audio_service = (AudioService*)arg;
-            audio_service->AudioInputTask();
-            vTaskDelete(NULL);
-        },
-        "audio_input", 2048 * 2, this, 8, &audio_input_task_handle_);
+        "audio_output", 2048 * 3, this, 7, &audio_output_task_handle_, 1);
 
-    /* Start the audio output task */
-    xTaskCreate(
-        [](void* arg) {
-            AudioService* audio_service = (AudioService*)arg;
-            audio_service->AudioOutputTask();
-            vTaskDelete(NULL);
-        },
-        "audio_output", 2048, this, 4, &audio_output_task_handle_);
-#endif
-
-    /* Start the opus codec task with high priority 5 to prevent audio lagging */
-    xTaskCreate(
+    /* Start the opus codec task on Core 1 with priority 5 */
+    xTaskCreatePinnedToCore(
         [](void* arg) {
             AudioService* audio_service = (AudioService*)arg;
             audio_service->OpusCodecTask();
             vTaskDelete(NULL);
         },
-        "opus_codec", 2048 * 12, this, 5, &opus_codec_task_handle_);
+        "opus_codec", 2048 * 12, this, 5, &opus_codec_task_handle_, 1);
 }
 
 void AudioService::Stop() {
     esp_timer_stop(audio_power_timer_);
     service_stopped_.store(true);
     xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING |
-                                     AS_EVENT_AUDIO_PROCESSOR_RUNNING);
+                                         AS_EVENT_AUDIO_PROCESSOR_RUNNING);
 
     bool notify_drained = false;
     {
@@ -582,12 +562,21 @@ void AudioService::PushTaskToEncodeQueue(AudioTaskType type, std::vector<int16_t
 bool AudioService::PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> packet, bool wait) {
     std::unique_lock<std::mutex> lock(audio_queue_mutex_);
     const uint32_t generation = playback_generation_;
-    
-    // Jad se fix: Agar queue full ho jaye, toh purana fasa hua packet turant drop karo taaki live audio na ruke
-    if (audio_decode_queue_.size() >= MAX_DECODE_PACKETS_IN_QUEUE) {
-        audio_decode_queue_.pop_front();
+
+    // Wait properly if queue is full instead of dropping live TTS packets!
+    while (audio_decode_queue_.full()) {
+        if (!wait) {
+            return false;
+        }
+        audio_queue_cv_.wait(lock, [this, generation]() {
+            return service_stopped_.load() || generation != playback_generation_ ||
+                   !audio_decode_queue_.full();
+        });
+        if (service_stopped_.load() || generation != playback_generation_) {
+            return false;
+        }
     }
-    
+
     if (service_stopped_.load() || generation != playback_generation_) {
         return false;
     }
@@ -662,6 +651,7 @@ void AudioService::EnableWakeWordDetection(bool enable) {
             audio_engine_->EnableWakeWordDetection(false);
         }
         xEventGroupClearBits(event_group_, AS_EVENT_WAKE_WORD_RUNNING);
+        xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
     }
 }
 
@@ -701,6 +691,7 @@ void AudioService::EnableVoiceProcessing(bool enable) {
             audio_engine_->EnableVoiceProcessing(false);
         }
         xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_PROCESSOR_RUNNING);
+        xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
     }
 }
 
@@ -710,6 +701,7 @@ void AudioService::EnableAudioTesting(bool enable) {
         xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING);
     } else {
         xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING);
+        xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
         std::lock_guard<std::mutex> lock(audio_queue_mutex_);
         audio_decode_queue_.clear();
         audio_decode_queue_.swap(audio_testing_queue_);
