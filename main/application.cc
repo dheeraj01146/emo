@@ -431,11 +431,11 @@ void Application::Run() {
                 pending_listening_start_ = false;
                 StartListeningAudio();
             }
-            // Wait until the entire playback buffer finishes before returning to Idle
+            // FIXED: Switch directly to Listening when playback finishes instead of Idle!
             if (s_tts_stop_pending && GetDeviceState() == kDeviceStateSpeaking &&
                 audio_service_.IsPlaybackIdle()) {
                 s_tts_stop_pending = false;
-                SetDeviceState(kDeviceStateIdle);
+                SetListeningMode(GetDefaultListeningMode());
             }
         }
 
@@ -487,10 +487,10 @@ void Application::Run() {
 
             if (state == kDeviceStateSpeaking || state == kDeviceStateNotifying) {
                 ServoController::GetInstance().OnSpeakingTick();
-                // Safety fallback if playback drained event already fired while s_tts_stop_pending was set
+                // FIXED: Safety fallback transitions to Listening instead of Idle!
                 if (s_tts_stop_pending && state == kDeviceStateSpeaking && audio_service_.IsPlaybackIdle()) {
                     s_tts_stop_pending = false;
-                    SetDeviceState(kDeviceStateIdle);
+                    SetListeningMode(GetDefaultListeningMode());
                 }
             } else {
                 auto display = Board::GetInstance().GetDisplay();
@@ -826,7 +826,7 @@ void Application::InitializeProtocol() {
                     if (GetDeviceState() == kDeviceStateSpeaking) {
                         if (audio_service_.IsPlaybackIdle()) {
                             s_tts_stop_pending = false;
-                            StartListening(); // Direct listening mode - no conditions!
+                            SetListeningMode(GetDefaultListeningMode()); // FIXED: Direct Auto-Listening!
                         } else {
                             s_tts_stop_pending = true;
                         }
@@ -1006,16 +1006,18 @@ void Application::HandleStartListeningEvent() {
         return;
     }
 
+    ListeningMode mode = GetDefaultListeningMode();
+
     if (state == kDeviceStateIdle) {
         if (!protocol_->IsAudioChannelOpened()) {
             SetDeviceState(kDeviceStateConnecting);
-            Schedule([this]() { ContinueOpenAudioChannel(kListeningModeManualStop); });
+            Schedule([this, mode]() { ContinueOpenAudioChannel(mode); });
             return;
         }
-        SetListeningMode(kListeningModeManualStop);
+        SetListeningMode(mode);
     } else if (state == kDeviceStateSpeaking) {
         AbortSpeaking(kAbortReasonNone);
-        SetListeningMode(kListeningModeManualStop);
+        SetListeningMode(mode);
     }
 }
 
