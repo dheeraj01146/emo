@@ -785,14 +785,8 @@ void Application::InitializeProtocol() {
 
     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
 
-    if (ota_->HasMqttConfig()) {
-        protocol_ = std::make_unique<MqttProtocol>();
-    } else if (ota_->HasWebsocketConfig()) {
-        protocol_ = std::make_unique<WebsocketProtocol>();
-    } else {
-        ESP_LOGW(TAG, "No protocol specified in the OTA config, using MQTT");
-        protocol_ = std::make_unique<MqttProtocol>();
-    }
+    // Jad se WebSocket par shift: MQTT ko bypass karke direct WebsocketProtocol initialize karo
+    protocol_ = std::make_unique<WebsocketProtocol>();
 
     protocol_->OnConnected([this]() { DismissAlert(); });
 
@@ -829,126 +823,24 @@ void Application::InitializeProtocol() {
     });
 
     protocol_->OnIncomingJson([this, display](const cJSON* root) {
+        // WebSocket JSON message parser handler
         auto type = cJSON_GetObjectItem(root, "type");
         if (!cJSON_IsString(type)) {
-            ESP_LOGW(TAG, "Incoming JSON message has no type");
             return;
         }
-        if (strcmp(type->valuestring, "notify") == 0) {
-            auto audio_url = cJSON_GetObjectItem(root, "audio_url");
-            if (!cJSON_IsString(audio_url) || audio_url->valuestring[0] == '\0') {
-                ESP_LOGW(TAG, "Notify message requires audio_url");
-                return;
-            }
-
-            std::vector<NotifySubtitle> subtitles;
-            auto subtitles_json = cJSON_GetObjectItem(root, "subtitles");
-            if (subtitles_json != nullptr && !cJSON_IsArray(subtitles_json)) {
-                ESP_LOGW(TAG, "Notify subtitles must be an array");
-                return;
-            }
-            if (cJSON_IsArray(subtitles_json)) {
-                cJSON* item = nullptr;
-                cJSON_ArrayForEach (item, subtitles_json) {
-                    auto start_ms = cJSON_GetObjectItem(item, "start_ms");
-                    auto text = cJSON_GetObjectItem(item, "text");
-                    if (!cJSON_IsNumber(start_ms) || start_ms->valuedouble < 0 ||
-                        start_ms->valuedouble > std::numeric_limits<uint32_t>::max() ||
-                        !cJSON_IsString(text)) {
-                        ESP_LOGW(TAG, "Ignoring invalid notify subtitle");
-                        continue;
-                    }
-                    subtitles.push_back({.start_ms = static_cast<uint32_t>(start_ms->valuedouble),
-                                         .text = text->valuestring});
-                }
-            }
-
-            Schedule([this, url = std::string(audio_url->valuestring),
-                      subtitles = std::move(subtitles)]() mutable {
-                StartNotification(std::move(url), std::move(subtitles));
-            });
-        } else if (strcmp(type->valuestring, "tts") == 0) {
+        if (strcmp(type->valuestring, "tts") == 0) {
             auto state = cJSON_GetObjectItem(root, "state");
-            if (!cJSON_IsString(state)) {
-                return;
-            }
-            if (strcmp(state->valuestring, "start") == 0) {
+            if (cJSON_IsString(state) && strcmp(state->valuestring, "start") == 0) {
                 Schedule([this]() {
                     aborted_ = false;
                     SetDeviceState(kDeviceStateSpeaking);
                 });
-            } else if (strcmp(state->valuestring, "stop") == 0) {
+            } else if (cJSON_IsString(state) && strcmp(state->valuestring, "stop") == 0) {
                 Schedule([this]() {
                     if (GetDeviceState() == kDeviceStateSpeaking) {
-                        if (listening_mode_ == kListeningModeManualStop) {
-                            SetDeviceState(kDeviceStateIdle);
-                        } else {
-                            SetDeviceState(kDeviceStateListening);
-                        }
+                        SetDeviceState(kDeviceStateIdle);
                     }
                 });
-            } else if (strcmp(state->valuestring, "sentence_start") == 0) {
-                auto text = cJSON_GetObjectItem(root, "text");
-                if (cJSON_IsString(text)) {
-                    std::vector<TextGlyph> glyphs;
-                    uint8_t bpp = 0;
-                    if (!TextGlyphPayload::Parse(root, glyphs, bpp)) {
-                        glyphs.clear();
-                    }
-                    ESP_LOGI(TAG, "<< %s", text->valuestring);
-                    Schedule([display, message = std::string(text->valuestring),
-                              glyphs = std::move(glyphs), bpp]() {
-                        display->AddTextGlyphs(glyphs, bpp);
-                        display->SetChatMessage("assistant", message.c_str());
-                    });
-                }
-            }
-        } else if (strcmp(type->valuestring, "stt") == 0) {
-            auto text = cJSON_GetObjectItem(root, "text");
-            if (cJSON_IsString(text)) {
-                std::vector<TextGlyph> glyphs;
-                uint8_t bpp = 0;
-                if (!TextGlyphPayload::Parse(root, glyphs, bpp)) {
-                    glyphs.clear();
-                }
-                ESP_LOGI(TAG, ">> %s", text->valuestring);
-                Schedule([display, message = std::string(text->valuestring),
-                          glyphs = std::move(glyphs), bpp]() {
-                    display->AddTextGlyphs(glyphs, bpp);
-                    display->SetChatMessage("user", message.c_str());
-                });
-            }
-        } else if (strcmp(type->valuestring, "llm") == 0) {
-            auto emotion = cJSON_GetObjectItem(root, "emotion");
-            if (cJSON_IsString(emotion)) {
-                Schedule([emotion_str = std::string(emotion->valuestring)]() {
-                    EmoMoodEngine::GetInstance().OnEmotionResponse(emotion_str.c_str());
-                });
-            }
-        } else if (strcmp(type->valuestring, "mcp") == 0) {
-            auto payload = cJSON_GetObjectItem(root, "payload");
-            if (cJSON_IsObject(payload)) {
-                McpServer::GetInstance().ParseMessage(payload);
-            }
-        } else if (strcmp(type->valuestring, "system") == 0) {
-            auto command = cJSON_GetObjectItem(root, "command");
-            if (cJSON_IsString(command)) {
-                ESP_LOGI(TAG, "System command: %s", command->valuestring);
-                if (strcmp(command->valuestring, "reboot") == 0) {
-                    Schedule([this]() { Reboot(); });
-                } else {
-                    ESP_LOGW(TAG, "Unknown system command: %s", command->valuestring);
-                }
-            }
-        } else if (strcmp(type->valuestring, "alert") == 0) {
-            auto status = cJSON_GetObjectItem(root, "status");
-            auto message = cJSON_GetObjectItem(root, "message");
-            auto emotion = cJSON_GetObjectItem(root, "emotion");
-            if (cJSON_IsString(status) && cJSON_IsString(message) && cJSON_IsString(emotion)) {
-                Alert(status->valuestring, message->valuestring, emotion->valuestring,
-                      Lang::Sounds::OGG_VIBRATION);
-            } else {
-                ESP_LOGW(TAG, "Alert command requires status, message and emotion");
             }
         }
     });
