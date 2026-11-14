@@ -45,8 +45,8 @@ void BroadcastRelayState(uint8_t dev_id, uint8_t state) {
         char topic[64];
         snprintf(topic, sizeof(topic), "dheeraj_emo_hub_9921/status/dev%d", dev_id);
         
-        // qos=1, retain=1 (retain=1 saves state on broker for web refresh sync)
-        esp_mqtt_client_publish(s_web_mqtt_client, topic, payload, 0, 1, 1);
+        // qos=0 for zero-lag instant response, retain=1 saves state on broker for web refresh sync
+        esp_mqtt_client_publish(s_web_mqtt_client, topic, payload, 0, 0, 1);
         ESP_LOGI("WebBridge", "State Broadcasted Retained -> Dev %d : %d", dev_id, state);
     }
 }
@@ -55,8 +55,8 @@ static void WebMqttEventHandler(void* handler_args, esp_event_base_t base, int32
     auto event = (esp_mqtt_event_handle_t)event_data;
     if (event_id == MQTT_EVENT_CONNECTED) {
         ESP_LOGI("WebBridge", "Connected to Web MQTT Broker! Subscribing & Syncing...");
-        esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/relay", 1);
-        esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/media", 1);
+        esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/relay", 0);
+        esp_mqtt_client_subscribe(event->client, "dheeraj_emo_hub_9921/control/media", 0);
 
         // Sync initial state on cloud connection
         for (uint8_t i = 1; i <= 4; i++) {
@@ -153,6 +153,9 @@ void Application::Initialize() {
     auto display = board.GetDisplay();
     display->SetupUI();
     RunEmoBootAnimation(display);
+    
+    // Initialize Servo before Mood Engine so Servo is ready for sync
+    ServoController::GetInstance().Initialize();
     EmoMoodEngine::GetInstance().Start(display);
     
     // Pet detection disabled/commented out to prevent false touch triggers on GPIO 40
@@ -162,7 +165,6 @@ void Application::Initialize() {
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
     audio_service_.Start();
-    ServoController::GetInstance().Initialize();
     ESP_LOGI(TAG, "After board/audio init");
     SystemInfo::PrintHeapStats();
 
@@ -845,8 +847,9 @@ void Application::InitializeProtocol() {
         } else if (strcmp(type->valuestring, "llm") == 0) {
             auto emotion = cJSON_GetObjectItem(root, "emotion");
             if (cJSON_IsString(emotion)) {
-                Schedule([display, emotion_str = std::string(emotion->valuestring)]() {
-                    display->SetEmotion(emotion_str.c_str());
+                Schedule([emotion_str = std::string(emotion->valuestring)]() {
+                    // Sync AI Response Emotion with both Display AND Servo Choreography!
+                    EmoMoodEngine::GetInstance().OnEmotionResponse(emotion_str.c_str());
                 });
             }
         } else if (strcmp(type->valuestring, "mcp") == 0) {
@@ -875,7 +878,8 @@ void Application::InitializeProtocol() {
                 ESP_LOGW(TAG, "Alert command requires status, message and emotion");
             }
         }
-    });
+    }
+    );
 
     protocol_->Start();
 }
@@ -909,6 +913,7 @@ void Application::Alert(const char* status, const char* message, const char* emo
     auto display = Board::GetInstance().GetDisplay();
     display->SetStatus(status);
     display->SetEmotion(emotion);
+    ServoController::GetInstance().ReactToEmotion(emotion);
     display->SetChatMessage("system", message);
     if (!sound.empty()) {
         audio_service_.PlaySound(sound);
@@ -1051,8 +1056,7 @@ void Application::HandleWakeWordDetectedEvent() {
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
     
-    // Hardcoded "happy" lock commented out; reset to "neutral" so Emo doesn't get stuck in happy mood
-    // EmoMoodEngine::GetInstance().ResetInteraction("happy");
+    // Wake up alert look on interaction
     EmoMoodEngine::GetInstance().ResetInteraction("neutral");
    
     if (state == kDeviceStateIdle) {
@@ -1132,21 +1136,26 @@ void Application::HandleStateChangedEvent() {
     switch (new_state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
+            EmoMoodEngine::GetInstance().SetIdleMode(true); // Resume idle masti loop!
             if (last_error_message_.empty()) {
                 display->SetStatus(Lang::Strings::STANDBY);
                 display->ClearChatMessages();
                 display->SetEmotion("neutral");
+                ServoController::GetInstance().SetTarget(90.0f, 1.0f);
             }
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
             break;
         case kDeviceStateConnecting:
+            EmoMoodEngine::GetInstance().SetIdleMode(false);
             display->SetEmotion("neutral");
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
+            EmoMoodEngine::GetInstance().SetIdleMode(false);
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
+            ServoController::GetInstance().OnListening();
             board.GetAudioCodec()->EnableInput(true);
           
             if (play_popup_on_listening_ || !audio_service_.IsAudioProcessorRunning()) {
@@ -1160,6 +1169,7 @@ void Application::HandleStateChangedEvent() {
             }
             break;
         case kDeviceStateSpeaking:
+            EmoMoodEngine::GetInstance().SetIdleMode(false);
             display->SetStatus(Lang::Strings::SPEAKING);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(false);
@@ -1167,11 +1177,13 @@ void Application::HandleStateChangedEvent() {
             audio_service_.ResetDecoder();
             break;
         case kDeviceStateNotifying:
+            EmoMoodEngine::GetInstance().SetIdleMode(false);
             display->SetStatus(Lang::Strings::SPEAKING);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(audio_service_.IsAfeWakeWord());
             break;
         case kDeviceStateWifiConfiguring:
+            EmoMoodEngine::GetInstance().SetIdleMode(false);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(false);
             break;
