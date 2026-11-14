@@ -76,11 +76,11 @@ static void ReadLiveBatteryLevel() {
 }
 
 static const char* GetBatteryIconSymbol(int pct) {
-    if (pct >= 80) return "[B-FULL]";
-    if (pct >= 60) return "[B-HIGH]";
-    if (pct >= 40) return "[B-MID]";
-    if (pct >= 15) return "[B-LOW]";
-    return "[B-DEAD]";
+    if (pct >= 85) return "[████]"; // Full Battery
+    if (pct >= 60) return "[███ ]"; // 3/4 Battery
+    if (pct >= 40) return "[██  ]"; // Half Battery
+    if (pct >= 15) return "[█   ]"; // Low Battery
+    return "[    ]";                // Empty / Critical
 }
 // ================= LIVE BATTERY MONITOR ENGINE END =================
 
