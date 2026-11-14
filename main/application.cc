@@ -34,46 +34,46 @@
 // ================= LIVE BATTERY MONITOR ENGINE START =================
 // GPIO 1 (ADC1_CHANNEL_0) par 100k+100k voltage divider se battery sense hogi.
 // Agar abhi battery sense wire nahi laga hai, toh floating reading par safe 85% fallback dikhayega!
-static adc_oneshot_unit_handle_t s_adc_handle = nullptr;
-static int s_battery_percent = 85;
-static float s_battery_voltage = 4.05f;
+//static adc_oneshot_unit_handle_t s_adc_handle = nullptr;
+//static int s_battery_percent = 85;
+//static float s_battery_voltage = 4.05f;
 
-static void InitBatteryMonitor() {
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = ADC_UNIT_1,
-        .ulp_mode = ADC_ULP_MODE_DISABLE,
-    };
-    if (adc_oneshot_new_unit(&init_config, &s_adc_handle) == ESP_OK) {
-        adc_oneshot_chan_cfg_t config = {
-            .atten = ADC_ATTEN_DB_12,
-            .bitwidth = ADC_BITWIDTH_DEFAULT,
-        };
-        adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_0, &config); // GPIO 1
-    }
-}
+//static void InitBatteryMonitor() {
+   // adc_oneshot_unit_init_cfg_t init_config = {
+      //  .unit_id = ADC_UNIT_1,
+     //   .ulp_mode = ADC_ULP_MODE_DISABLE,
+ //   };
+  //  if (adc_oneshot_new_unit(&init_config, &s_adc_handle) == ESP_OK) {
+    //    adc_oneshot_chan_cfg_t config = {
+     //       .atten = ADC_ATTEN_DB_12,
+     //       .bitwidth = ADC_BITWIDTH_DEFAULT,
+    //    };
+    //    adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_0, &config); // GPIO 1
+  //  }
+//}
 
-static void ReadLiveBatteryLevel() {
-    if (!s_adc_handle) return;
+//static void ReadLiveBatteryLevel() {
+   // if (!s_adc_handle) return;
 
-    int raw = 0;
-    if (adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw) == ESP_OK) {
-        // Voltage divider (x2) calculation for 1S Li-ion (3.3V = 0%, 4.2V = 100%)
-        float v_pin = (raw / 4095.0f) * 3.1f;
-        float v_bat = v_pin * 2.0f;
+//    int raw = 0;
+//    if (adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw) == ESP_OK) {
+   //     // Voltage divider (x2) calculation for 1S Li-ion (3.3V = 0%, 4.2V = 100%)
+   //     float v_pin = (raw / 4095.0f) * 3.1f;
+    //    float v_bat = v_pin * 2.0f;
 
         // Agar pin abhi khuli (floating/unconnected) hai, toh clean 88% USB/Power status rakho
-        if (v_bat < 2.8f || v_bat > 4.5f) {
-            s_battery_percent = 88;
-            s_battery_voltage = 4.08f;
-        } else {
-            s_battery_voltage = v_bat;
-            int pct = static_cast<int>(((v_bat - 3.30f) / (4.20f - 3.30f)) * 100.0f);
-            if (pct < 0) pct = 0;
-            if (pct > 100) pct = 100;
-            s_battery_percent = pct;
-        }
-    }
-}
+      //  if (v_bat < 2.8f || v_bat > 4.5f) {
+        //    s_battery_percent = 88;
+        //    s_battery_voltage = 4.08f;
+       // } else {
+        //    s_battery_voltage = v_bat;
+//int pct = static_cast<int>(((v_bat - 3.30f) / (4.20f - 3.30f)) * 100.0f);
+      //      if (pct < 0) pct = 0;
+          //  if (pct > 100) pct = 100;
+           // s_battery_percent = pct;
+       // }
+//    }
+//}
 
 //static const char* GetBatteryIconSymbol(int pct) {
   //  if (pct >= 85) return "[████]"; // Full Battery
