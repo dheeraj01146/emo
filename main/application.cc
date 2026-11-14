@@ -32,60 +32,49 @@
 #define TAG "Application"
 
 // ================= LIVE BATTERY MONITOR ENGINE START =================
- GPIO 1 (ADC1_CHANNEL_0) par 100k+100k voltage divider se battery sense hogi.
- Agar abhi battery sense wire nahi laga hai, toh floating reading par safe 85% fallback dikhayega!
 static adc_oneshot_unit_handle_t s_adc_handle = nullptr;
 static int s_battery_percent = 85;
 static float s_battery_voltage = 4.05f;
 
 static void InitBatteryMonitor() {
-   adc_oneshot_unit_init_cfg_t init_config = {
-       .unit_id = ADC_UNIT_1,
-     / .ulp_mode = ADC_ULP_MODE_DISABLE,
-   };
-   if (adc_oneshot_new_unit(&init_config, &s_adc_handle) == ESP_OK) {
-       adc_oneshot_chan_cfg_t config = {
-            .atten = ADC_ATTEN_DB_12,
-            .bitwidth = ADC_BITWIDTH_DEFAULT,
-      };
-       adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_0, &config); // GPIO 1
-   }
+    adc_oneshot_unit_init_cfg_t init_config = {
+        .unit_id = ADC_UNIT_1,
+        .ulp_mode = ADC_ULP_MODE_DISABLE,
+    };
+    if (adc_oneshot_new_unit(&init_config, &s_adc_handle) == ESP_OK) {
+        adc_oneshot_chan_cfg_t config = {
+             .atten = ADC_ATTEN_DB_12,
+             .bitwidth = ADC_BITWIDTH_DEFAULT,
+        };
+        adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_0, &config); // GPIO 1
+    }
 }
 
 static void ReadLiveBatteryLevel() {
     if (!s_adc_handle) return;
 
-  int raw = 0;  if (adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw) == ESP_OK) {
-       // Voltage divider (x2) calculation for 1S Li-ion (3.3V = 0%, 4.2V = 100%)
+    int raw = 0;  
+    if (adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw) == ESP_OK) {
         float v_pin = (raw / 4095.0f) * 3.1f;
         float v_bat = v_pin * 2.0f;
        
-      // Agar pin abhi khuli (floating/unconnected) hai, toh clean 88% USB/Power status rakho
         if (v_bat < 2.8f || v_bat > 4.5f) {
-          s_battery_percent = 88;
+            s_battery_percent = 88;
             s_battery_voltage = 4.08f;
         } else {
             s_battery_voltage = v_bat;
-     int pct = static_cast<int>(((v_bat - 3.30f) / (4.20f - 3.30f)) * 100.0f);
-      if (pct < 0) pct = 0;
-           if (pct > 100) pct = 100;
-          s_battery_percent = pct;
-       }
-   }
-}
-
-//static const char* GetBatteryIconSymbol(int pct) {
-    if (pct >= 85) return "[████]"; // Full Battery
-    if (pct >= 60) return "[███ ]"; // 3/4 Battery
-    if (pct >= 40) return "[██  ]"; // Half Battery
-    if (pct >= 15) return "[█   ]"; // Low Battery
-    return "[    ]";                // Empty / Critical
+            int pct = static_cast<int>(((v_bat - 3.30f) / (4.20f - 3.30f)) * 100.0f);
+            if (pct < 0) pct = 0;
+            if (pct > 100) pct = 100;
+            s_battery_percent = pct;
+        }
+    }
 }
 // ================= LIVE BATTERY MONITOR ENGINE END =================
 
 // ================= WEB MQTT BRIDGE & LIVE STATE SYNC START =================
 static esp_mqtt_client_handle_t s_web_mqtt_client = nullptr;
-static uint8_t s_relay_states[5] = {0, 0, 0, 0, 0}; // Index 1: Light1, 2: Light2, 3: Fan, 4: TV
+static uint8_t s_relay_states[5] = {0, 0, 0, 0, 0};
 
 void BroadcastRelayState(uint8_t dev_id, uint8_t state) {
     if (dev_id < 1 || dev_id > 4) return;
@@ -98,7 +87,6 @@ void BroadcastRelayState(uint8_t dev_id, uint8_t state) {
         char topic[64];
         snprintf(topic, sizeof(topic), "dheeraj_emo_hub_9921/status/dev%d", dev_id);
         
-        // qos=0 for zero-lag instant response, retain=1 saves state on broker
         esp_mqtt_client_publish(s_web_mqtt_client, topic, payload, 0, 0, 1);
         ESP_LOGI("WebBridge", "State Broadcasted Retained -> Dev %d : %d", dev_id, state);
     }
@@ -201,17 +189,14 @@ void Application::Initialize() {
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);
 
-    // Initialize Live Battery ADC Monitor
     InitBatteryMonitor();
     ReadLiveBatteryLevel();
 
-    // Setup the display
     auto display = board.GetDisplay();
     display->SetupUI();
     RunEmoBootAnimation(display);
     EmoMoodEngine::GetInstance().Start(display);
     
-    // Setup the audio service
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
     audio_service_.Start();
@@ -243,20 +228,17 @@ void Application::Initialize() {
 
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
 
-    // Add MCP tools
     auto& mcp_server = McpServer::GetInstance();
     mcp_server.AddCommonTools();
     mcp_server.AddUserOnlyTools();
 
-    // Live Battery Check Tool (Voice query + On-screen notification)
     mcp_server.AddTool("get_battery_status",
         "Get live battery percentage and voltage of EMO robot",
         PropertyList(),
         [](const PropertyList& properties) -> ToolResult {
             ReadLiveBatteryLevel();
             char buf[96];
-            snprintf(buf, sizeof(buf), "%s Battery: %d%% (%.2fV)",
-                     GetBatteryIconSymbol(s_battery_percent), s_battery_percent, s_battery_voltage);
+            snprintf(buf, sizeof(buf), "Battery: %d%% (%.2fV)", s_battery_percent, s_battery_voltage);
             auto display = Board::GetInstance().GetDisplay();
             if (display) {
                 display->ShowNotification(buf, 5000);
@@ -264,7 +246,6 @@ void Application::Initialize() {
             return std::string(buf);
         });
 
-    // Math & Physics Equation Display Tool
     mcp_server.AddTool("show_math_solution",
         "Display step-by-step math or physics equation solutions on the screen",
         PropertyList({
@@ -302,7 +283,6 @@ void Application::Initialize() {
             return "Solution displayed on screen";
         }); 
 
-    // 1. Light 1
     mcp_server.AddTool("control_light1", "Turn Light 1 on or off",
         PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
@@ -312,7 +292,6 @@ void Application::Initialize() {
             return state ? "Light 1 turned on" : "Light 1 turned off";
         });
 
-    // 2. Light 2
     mcp_server.AddTool("control_light2", "Turn Light 2 on or off",
         PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
@@ -322,7 +301,6 @@ void Application::Initialize() {
             return state ? "Light 2 turned on" : "Light 2 turned off";
         });
 
-    // 3. Fan   
     mcp_server.AddTool("control_fan", "Turn Fan on or off",
         PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
@@ -332,7 +310,6 @@ void Application::Initialize() {
             return state ? "Fan turned on" : "Fan turned off";
         });
 
-    // 4. TV
     mcp_server.AddTool("control_tv", "Turn TV on or off",
         PropertyList({ Property("state", kPropertyTypeBoolean) }),
         [](const PropertyList& properties) -> ToolResult {
@@ -342,7 +319,6 @@ void Application::Initialize() {
             return state ? "TV turned on" : "TV turned off";
         });
   
-    // 5. Phone Flashlight Control Tool
     mcp_server.AddTool("control_phone_torch", "Turn phone flashlight/torch on or off",
         PropertyList({ Property("action", kPropertyTypeString) }),
         [this](const PropertyList& properties) -> ToolResult {
@@ -352,7 +328,6 @@ void Application::Initialize() {
             return "Phone torch " + action + " sent";
         });
 
-    // 6. Phone Companion Action Query
     mcp_server.AddTool("query_phone_action", "Forward general internet or device queries to companion phone",
         PropertyList({ Property("query", kPropertyTypeString) }),
         [this](const PropertyList& properties) -> ToolResult {
@@ -500,9 +475,6 @@ void Application::Run() {
             auto state = GetDeviceState();
 
             if (state == kDeviceStateSpeaking || state == kDeviceStateNotifying) {
-                // ZERO-STUTTER FIX:
-                // Bolte/Gaana bajate waqt PrintHeapStats() aur LCD SPI redraw bilkul mat chalao
-                // taaki har 10 second wala audio packet drop 100% khatam ho jaye!
                 ServoController::GetInstance().OnSpeakingTick();
             } else {
                 auto display = Board::GetInstance().GetDisplay();
@@ -511,19 +483,16 @@ void Application::Run() {
                 if (state == kDeviceStateIdle) {
                     ServoController::GetInstance().OnIdleTick();
 
-                    // Har 10 second mein Idle screen ke top bar par Live Battery Icon + % dikhao
                     if (clock_ticks_ % 10 == 0 && last_error_message_.empty()) {
                         ReadLiveBatteryLevel();
                         char status_batt[48];
-                        snprintf(status_batt, sizeof(status_batt), "%s %s %d%%",
+                        snprintf(status_batt, sizeof(status_batt), "%s Battery: %d%%",
                                  Lang::Strings::STANDBY,
-                                 GetBatteryIconSymbol(s_battery_percent),
                                  s_battery_percent);
                         display->SetStatus(status_batt);
                     }
                 }
 
-                // Heap stats sirf har 30s mein aur sirf non-speaking state mein print karo
                 if (clock_ticks_ % 30 == 0) {
                     SystemInfo::PrintHeapStats();
                 }
@@ -539,7 +508,6 @@ void Application::Run() {
 void Application::HandleNetworkConnectedEvent() {
     ESP_LOGI(TAG, "Network connected");
 
-    // Disable aggressive modem sleep that causes UDP audio packet reordering
     esp_wifi_set_ps(WIFI_PS_NONE);
 
     uint8_t current_channel = 6;
@@ -620,7 +588,6 @@ void Application::HandleActivationDoneEvent() {
   
     ota_.reset();
     auto& board = Board::GetInstance();
-    // Use MIN_MODEM instead of MAX_MODEM so Wi-Fi stays stable while saving battery
     board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
     esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
 
@@ -784,7 +751,6 @@ void Application::InitializeProtocol() {
 
     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
 
-    // Jad se WebSocket par shift: MQTT ko bypass karke direct WebsocketProtocol initialize karo
     protocol_ = std::make_unique<WebsocketProtocol>();
 
     protocol_->OnConnected([this]() { DismissAlert(); });
@@ -822,7 +788,6 @@ void Application::InitializeProtocol() {
     });
 
     protocol_->OnIncomingJson([this, display](const cJSON* root) {
-        // WebSocket JSON message parser handler
         auto type = cJSON_GetObjectItem(root, "type");
         if (!cJSON_IsString(type)) {
             return;
@@ -888,9 +853,8 @@ void Application::DismissAlert() {
         auto display = Board::GetInstance().GetDisplay();
         ReadLiveBatteryLevel();
         char status_batt[48];
-        snprintf(status_batt, sizeof(status_batt), "%s %s %d%%",
+        snprintf(status_batt, sizeof(status_batt), "%s Battery: %d%%",
                  Lang::Strings::STANDBY,
-                 GetBatteryIconSymbol(s_battery_percent),
                  s_battery_percent);
         display->SetStatus(status_batt);
         display->SetEmotion("neutral");
@@ -1110,9 +1074,8 @@ void Application::HandleStateChangedEvent() {
             if (last_error_message_.empty()) {
                 ReadLiveBatteryLevel();
                 char status_batt[48];
-                snprintf(status_batt, sizeof(status_batt), "%s %s %d%%",
+                snprintf(status_batt, sizeof(status_batt), "%s Battery: %d%%",
                          Lang::Strings::STANDBY,
-                         GetBatteryIconSymbol(s_battery_percent),
                          s_battery_percent);
                 display->SetStatus(status_batt);
                 display->ClearChatMessages();
