@@ -821,13 +821,13 @@ void Application::InitializeProtocol() {
                 Schedule([this]() {
                     SetDeviceState(kDeviceStateSpeaking);
                 });
-            } else if (cJSON_IsString(state) && strcmp(state->valuestring, "stop") == 0) {
+           } else if (cJSON_IsString(state) && strcmp(state->valuestring, "stop") == 0) {
                 Schedule([this]() {
                     if (GetDeviceState() == kDeviceStateSpeaking) {
                         if (audio_service_.IsPlaybackIdle()) {
                             s_tts_stop_pending = false;
 
-                            if aec_mode_ != KAecOFF) {
+                            if (aec_mode_ != kAecOff) {
                                 StartListening();
                             } else {
                                 SetDeviceState(kDeviceStateIdle);
