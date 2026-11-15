@@ -8,16 +8,16 @@
 #include <cmath>
 #include <cstring>
 
-#define SERVO_PIN           GPIO_NUM_18
-#define SERVO_LEDC_TIMER    LEDC_TIMER_2
-#define SERVO_LEDC_MODE     LEDC_LOW_SPEED_MODE
-#define SERVO_LEDC_CHANNEL  LEDC_CHANNEL_2
-#define SERVO_LEDC_RES      LEDC_TIMER_14_BIT
+#define SERVO_PIN            GPIO_NUM_18
+#define SERVO_LEDC_TIMER     LEDC_TIMER_2
+#define SERVO_LEDC_MODE      LEDC_LOW_SPEED_MODE
+#define SERVO_LEDC_CHANNEL   LEDC_CHANNEL_2
+#define SERVO_LEDC_RES       LEDC_TIMER_14_BIT
 
 struct ServoStep {
     float angle;
     float speed;
-    int hold_ticks; // 1 tick = 20ms (e.g., 20 ticks = 400ms)
+    int hold_ticks; // 1 tick = 20ms
 };
 
 class ServoController {
@@ -53,7 +53,7 @@ public:
 
         current_angle_ = 90.0f;
         target_angle_ = 90.0f;
-        step_speed_ = 1.2f;
+        step_speed_ = 1.0f;
         ApplyHardwareAngle(90.0f);
 
         xTaskCreate([](void* arg) {
@@ -61,12 +61,11 @@ public:
         }, "servo_smooth", 2048, this, 3, nullptr);
     }
 
-    void SetTarget(float angle, float speed = 1.2f) {
-        seq_len_ = 0; // Cancel any running sequence
+    void SetTarget(float angle, float speed = 1.0f) {
+        seq_len_ = 0; 
         SetTargetInternal(angle, speed);
     }
 
-    // Multi-step bakchodi / dance moves chalane ke liye
     void PlaySequence(const ServoStep* steps, int count) {
         if (count <= 0 || count > 8) return;
         for (int i = 0; i < count; i++) {
@@ -78,100 +77,78 @@ public:
         SetTargetInternal(seq_[0].angle, seq_[0].speed);
     }
 
-    // Asli EMO ki tarah Emotion aur AI Response ke hisaab se physical reaction!
     void ReactToEmotion(const char* emotion) {
         if (emotion == nullptr) return;
 
+        // Wajan aur load bachane ke liye saare angles ko 82° aur 98° ke beech rakha hai
         if (strcmp(emotion, "happy") == 0 || strcmp(emotion, "laughing") == 0 || strcmp(emotion, "funny") == 0) {
-            // Khushi mein Left-Right Wiggle Dance!
             const ServoStep happy_wiggle[] = {
-                {70.0f, 2.2f, 12},
-                {110.0f, 2.2f, 12},
-                {76.0f, 2.0f, 10},
-                {104.0f, 2.0f, 10},
-                {90.0f, 1.5f, 5}
+                {85.0f, 1.5f, 10},
+                {95.0f, 1.5f, 10},
+                {90.0f, 1.2f, 5}
             };
-            PlaySequence(happy_wiggle, 5);
+            PlaySequence(happy_wiggle, 3);
         }
         else if (strcmp(emotion, "angry") == 0 || strcmp(emotion, "frustrated") == 0) {
-            // Gusse mein sharp aggressive head shake!
             const ServoStep angry_shake[] = {
-                {122.0f, 2.8f, 10},
-                {58.0f, 2.8f, 10},
-                {115.0f, 2.5f, 10},
-                {90.0f, 1.8f, 5}
+                {86.0f, 2.0f, 8},
+                {94.0f, 2.0f, 8},
+                {90.0f, 1.5f, 5}
             };
-            PlaySequence(angry_shake, 4);
+            PlaySequence(angry_shake, 3);
         }
         else if (strcmp(emotion, "thinking") == 0 || strcmp(emotion, "confused") == 0) {
-            // Sochte waqt pehle Left dekhega, rukega, phir halka Right
             const ServoStep think_look[] = {
-                {62.0f, 1.0f, 45},  // Slow left look & hold
-                {108.0f, 0.9f, 35}, // Slow right glance
-                {75.0f, 1.0f, 20}
+                {85.0f, 0.8f, 30},
+                {95.0f, 0.8f, 30},
+                {90.0f, 1.0f, 5}
             };
             PlaySequence(think_look, 3);
         }
         else if (strcmp(emotion, "surprised") == 0 || strcmp(emotion, "shocked") == 0) {
-            // Double-take! (Jhatke se idhar-udhar dekhna)
             const ServoStep double_take[] = {
-                {55.0f, 3.2f, 8},
-                {125.0f, 3.2f, 12},
-                {90.0f, 2.5f, 5}
+                {84.0f, 2.2f, 6},
+                {96.0f, 2.2f, 8},
+                {90.0f, 1.5f, 5}
             };
             PlaySequence(double_take, 3);
         }
         else if (strcmp(emotion, "cool") == 0 || strcmp(emotion, "wink") == 0 || strcmp(emotion, "confident") == 0) {
-            // Swag side-pose
             const ServoStep cool_pose[] = {
-                {118.0f, 1.6f, 40},
-                {82.0f, 1.2f, 20},
+                {94.0f, 1.2f, 30},
                 {90.0f, 1.0f, 5}
             };
-            PlaySequence(cool_pose, 3);
+            PlaySequence(cool_pose, 2);
         }
         else if (strcmp(emotion, "sad") == 0 || strcmp(emotion, "crying") == 0) {
-            // Dheere se gardan ek taraf jhuka lena
-            SetTarget(68.0f, 0.5f);
+            SetTarget(86.0f, 0.5f);
         }
         else if (strcmp(emotion, "sleepy") == 0) {
-            // Sote waqt slow resting corner
-            SetTarget(78.0f, 0.4f);
+            SetTarget(88.0f, 0.4f);
         }
         else if (strcmp(emotion, "left") == 0) {
-            SetTarget(58.0f, 1.5f);
+            SetTarget(85.0f, 1.2f);
         }
         else if (strcmp(emotion, "right") == 0) {
-            SetTarget(122.0f, 1.5f);
+            SetTarget(95.0f, 1.2f);
         }
         else {
-            // Neutral / Center
-            SetTarget(90.0f, 1.2f);
+            SetTarget(90.0f, 1.0f);
         }
     }
 
-    // Backwards compatibility ke liye
     void SetDirection(const char* emotion) {
         ReactToEmotion(emotion);
     }
 
-    void OnIdleTick() {
-        // Idle movement ab EmoMoodEngine khud display ke sath sync karke chalayega
-        // Taaki display aur servo alag-alag na bhaagein!
-    }
+    void OnIdleTick() {}
 
     void OnListening() {
-        // Jab user bole, toh turant seedha hoke dhyan se sune
-        const ServoStep alert_listen[] = {
-            {96.0f, 2.2f, 6},
-            {90.0f, 1.8f, 5}
-        };
-        PlaySequence(alert_listen, 2);
+        SetTarget(90.0f, 1.5f);
     }
 
     void OnSpeakingTick() {
-        // Bolte waqt natural gesturing
-        if (seq_len_ > 0) return; // Agar emotion sequence chal raha hai toh usko mat kaato
+        if (seq_len_ > 0) return; 
 
         static int action_cooldown = 0;
         if (action_cooldown > 0) {
@@ -179,20 +156,17 @@ public:
             return;
         }
 
+        // Bolte waqt movement ki frequency aur range bohot kam kar di hai
         int r = esp_random() % 100;
-        if (r < 35) {
-            SetTarget(74.0f + (esp_random() % 10), 1.4f);
-            action_cooldown = 1;
-        } else if (r < 70) {
-            SetTarget(96.0f + (esp_random() % 10), 1.4f);
-            action_cooldown = 1;
-        } else if (r < 88) {
-            float tilt = (esp_random() % 2 == 0) ? 64.0f : 116.0f;
-            SetTarget(tilt, 1.8f);
-            action_cooldown = 2;
+        if (r < 20) {
+            SetTarget(88.0f + (esp_random() % 3), 1.0f);
+            action_cooldown = 3; // Thoda lamba gap rakha hai taaki motor continuous na gume
+        } else if (r < 40) {
+            SetTarget(90.0f + (esp_random() % 3), 1.0f);
+            action_cooldown = 3;
         } else {
-            SetTarget(90.0f, 1.2f);
-            action_cooldown = 1;
+            SetTarget(90.0f, 1.0f);
+            action_cooldown = 2;
         }
     }
 
@@ -201,7 +175,7 @@ private:
 
     float current_angle_ = 90.0f;
     float target_angle_ = 90.0f;
-    float step_speed_ = 1.2f;
+    float step_speed_ = 1.0f;
 
     ServoStep seq_[8];
     int seq_len_ = 0;
@@ -209,8 +183,9 @@ private:
     int seq_wait_ticks_ = 0;
 
     void SetTargetInternal(float angle, float speed) {
-        if (angle < 50.0f) angle = 50.0f;
-        if (angle > 130.0f) angle = 130.0f;
+        // HARD SAFETY LIMIT: Motor ko 80° se 100° ke bahar jaane hi nahi dega, wajan safe rahega!
+        if (angle < 80.0f) angle = 80.0f;
+        if (angle > 100.0f) angle = 100.0f;
         target_angle_ = angle;
         step_speed_ = speed;
     }
@@ -233,7 +208,6 @@ private:
                 }
                 ApplyHardwareAngle(current_angle_);
             } else if (seq_len_ > 0) {
-                // Target angle par pahunch gaya, ab hold_ticks wait karke agla step chalao
                 if (seq_wait_ticks_ > 0) {
                     seq_wait_ticks_--;
                 } else {
@@ -242,7 +216,7 @@ private:
                         seq_wait_ticks_ = seq_[seq_index_].hold_ticks;
                         SetTargetInternal(seq_[seq_index_].angle, seq_[seq_index_].speed);
                     } else {
-                        seq_len_ = 0; // Sequence khatam
+                        seq_len_ = 0; 
                     }
                 }
             }
