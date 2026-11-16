@@ -27,9 +27,6 @@
             --amber-glow: rgba(255, 183, 0, 0.35);
             --emerald: #00e676;
             --rose: #ff2a55;
-            --blue-light: #38bdf8;
-            --red-light: #ff2a55;
-            --green-light: #00e676;
             --text-head: #ffffff;
             --text-main: #dbe4ef;
             --text-muted: #6e8098;
@@ -326,7 +323,7 @@
             background: var(--panel-active);
         }
 
-        /* Combo Toolbar */
+        /* Combo Toolbar - Styled same as Master Toolbar for clean symmetry */
         .combo-toolbar {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -335,17 +332,18 @@
         .combo-btn {
             background: var(--panel-raised);
             border: 1px solid var(--border-light);
-            border-radius: 12px;
-            padding: 10px 6px;
+            border-radius: 14px;
+            padding: 12px 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.68rem;
+            font-size: 0.72rem;
             font-weight: 700;
+            letter-spacing: 0.5px;
             color: var(--text-main);
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
-            transition: transform 0.08s ease;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+            transition: transform 0.08s ease, background 0.08s ease;
         }
         .combo-btn:active {
             transform: scale(0.94);
@@ -393,7 +391,6 @@
             position: relative;
             overflow: hidden;
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
-            /* Ghost touch optimization: instant feedback */
             transition: transform 0.08s ease, border-color 0.1s ease, background 0.1s ease, box-shadow 0.1s ease;
             will-change: transform, background;
         }
@@ -401,26 +398,11 @@
             transform: scale(0.93);
         }
         
-        /* Individual active lighting glows */
-        .appliance-tile.active-1 {
-            background: #121d2b;
-            border-color: rgba(56, 189, 248, 0.6);
-            box-shadow: 0 14px 32px rgba(56, 189, 248, 0.25);
-        }
-        .appliance-tile.active-2 {
-            background: #112233;
-            border-color: rgba(56, 189, 248, 0.8);
-            box-shadow: 0 14px 32px rgba(56, 189, 248, 0.4);
-        }
-        .appliance-tile.active-3 {
-            background: #2a1218;
-            border-color: rgba(255, 42, 85, 0.8);
-            box-shadow: 0 14px 32px rgba(255, 42, 85, 0.4);
-        }
-        .appliance-tile.active-4 {
-            background: #10281b;
-            border-color: rgba(0, 230, 118, 0.8);
-            box-shadow: 0 14px 32px rgba(0, 230, 118, 0.4);
+        /* Clean Minimal Active State */
+        .appliance-tile.active {
+            background: #181d27;
+            border-color: rgba(255, 183, 0, 0.55);
+            box-shadow: 0 14px 32px var(--amber-glow);
         }
 
         .tile-head {
@@ -441,11 +423,11 @@
             font-size: 1.4rem;
             transition: all 0.1s ease;
         }
-        
-        .appliance-tile.active-1 .tile-icon-box { background: var(--blue-light); color: #06090e; box-shadow: 0 0 18px rgba(56, 189, 248, 0.7); }
-        .appliance-tile.active-2 .tile-icon-box { background: var(--blue-light); color: #06090e; box-shadow: 0 0 18px rgba(56, 189, 248, 0.7); }
-        .appliance-tile.active-3 .tile-icon-box { background: var(--red-light); color: #fff; box-shadow: 0 0 18px rgba(255, 42, 85, 0.7); }
-        .appliance-tile.active-4 .tile-icon-box { background: var(--green-light); color: #06090e; box-shadow: 0 0 18px rgba(0, 230, 118, 0.7); }
+        .appliance-tile.active .tile-icon-box {
+            background: var(--amber-warm);
+            color: #06090e;
+            box-shadow: 0 0 18px rgba(255, 183, 0, 0.7);
+        }
 
         .tactile-switch {
             width: 50px;
@@ -466,18 +448,15 @@
             left: 3px;
             transition: transform 0.1s ease, background 0.1s ease;
         }
-        
-        .appliance-tile.active-1 .tactile-switch { background: rgba(56, 189, 248, 0.22); border-color: var(--blue-light); }
-        .appliance-tile.active-1 .tactile-knob { transform: translateX(22px); background: var(--blue-light); box-shadow: 0 0 10px var(--blue-light); }
-
-        .appliance-tile.active-2 .tactile-switch { background: rgba(56, 189, 248, 0.22); border-color: var(--blue-light); }
-        .appliance-tile.active-2 .tactile-knob { transform: translateX(22px); background: var(--blue-light); box-shadow: 0 0 10px var(--blue-light); }
-
-        .appliance-tile.active-3 .tactile-switch { background: rgba(255, 42, 85, 0.22); border-color: var(--red-light); }
-        .appliance-tile.active-3 .tactile-knob { transform: translateX(22px); background: var(--red-light); box-shadow: 0 0 10px var(--red-light); }
-
-        .appliance-tile.active-4 .tactile-switch { background: rgba(0, 230, 118, 0.22); border-color: var(--green-light); }
-        .appliance-tile.active-4 .tactile-knob { transform: translateX(22px); background: var(--green-light); box-shadow: 0 0 10px var(--green-light); }
+        .appliance-tile.active .tactile-switch {
+            background: rgba(255, 183, 0, 0.22);
+            border-color: var(--amber-warm);
+        }
+        .appliance-tile.active .tactile-knob {
+            transform: translateX(22px);
+            background: var(--amber-warm);
+            box-shadow: 0 0 10px var(--amber-warm);
+        }
 
         .tile-foot {
             display: flex;
@@ -497,12 +476,9 @@
             justify-content: space-between;
         }
         .tile-spec span.active-tag {
+            color: var(--amber-warm);
             font-weight: 700;
         }
-        .appliance-tile.active-1 .active-tag { color: var(--blue-light); }
-        .appliance-tile.active-2 .active-tag { color: var(--blue-light); }
-        .appliance-tile.active-3 .active-tag { color: var(--red-light); }
-        .appliance-tile.active-4 .active-tag { color: var(--green-light); }
 
         /* Companion & Telemetry */
         .companion-bar {
@@ -638,9 +614,9 @@
         <span>MULTI-STATE</span>
     </div>
     <div class="combo-toolbar">
-        <div class="combo-btn" onclick="triggerCombo(3, 4)">🔴+🟢 GREEN & RED</div>
-        <div class="combo-btn" onclick="triggerCombo(3, 2)">🔴+🔵 RED & BLUE</div>
-        <div class="combo-btn" onclick="triggerCombo(4, 2)">🟢+🔵 GREEN & BLUE</div>
+        <div class="combo-btn" onclick="triggerCombo(3, 4)">GREEN + RED</div>
+        <div class="combo-btn" onclick="triggerCombo(3, 2)">RED + BLUE</div>
+        <div class="combo-btn" onclick="triggerCombo(4, 2)">GREEN + BLUE</div>
     </div>
 
     <!-- Appliance Tiles Header -->
@@ -649,7 +625,7 @@
         <span id="active-summary">0 ACTIVE</span>
     </div>
 
-    <!-- 4 Touch Tiles (Optimized for Ghost Touch Response) -->
+    <!-- 4 Touch Tiles -->
     <div class="tiles-grid">
         <div class="appliance-tile" id="tile-1" ontouchstart="handleTouchStart(1)" onclick="toggleRelay(1)">
             <div class="tile-head">
@@ -725,7 +701,6 @@
     </div>
 
     <script>
-        // 1. Fast Intro (0.6s) + Parallel MQTT Connect
         window.addEventListener('DOMContentLoaded', () => {
             connectMQTT();
             setTimeout(() => {
@@ -734,7 +709,6 @@
             }, 600);
         });
 
-        // 2. High-Speed MQTT Pipeline
         const MQTT_BROKER = "broker.emqx.io";
         const MQTT_PORT = 8084;
         const MQTT_PATH = "/mqtt";
@@ -755,9 +729,7 @@
             } catch (e) {}
         }
 
-        // Ghost Touch instantaneous handler for ultra-snappy mobile feel
         function handleTouchStart(id) {
-            // Pre-emptively toggle visually on touchstart for absolute 0ms perceived lag
             triggerHaptic();
         }
 
@@ -787,10 +759,10 @@
             if (!tile) return;
 
             if (state) {
-                tile.className = `appliance-tile active-${id}`;
+                tile.classList.add('active');
                 if (statusLabel) statusLabel.innerText = "ONLINE";
             } else {
-                tile.className = 'appliance-tile';
+                tile.classList.remove('active');
                 if (statusLabel) statusLabel.innerText = "STANDBY";
             }
 
@@ -843,7 +815,6 @@
             triggerHaptic();
             triggerEmoReaction('happy');
             
-            // Turn both ON simultaneously
             setTimeout(() => {
                 if (!states[id1]) { lastLocalClick[id1] = Date.now(); updateCardUI(id1, true); publishFast(TOPIC_RELAY, { id: id1, state: 1 }); }
             }, 0);
