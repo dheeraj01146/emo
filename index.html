@@ -27,6 +27,9 @@
             --amber-glow: rgba(255, 183, 0, 0.35);
             --emerald: #00e676;
             --rose: #ff2a55;
+            --blue-light: #38bdf8;
+            --red-light: #ff2a55;
+            --green-light: #00e676;
             --text-head: #ffffff;
             --text-main: #dbe4ef;
             --text-muted: #6e8098;
@@ -316,10 +319,36 @@
             color: var(--text-main);
             cursor: pointer;
             box-shadow: 0 6px 14px rgba(0,0,0,0.3);
-            transition: transform 0.1s ease;
+            transition: transform 0.08s ease, background 0.08s ease;
         }
         .master-action-btn:active {
-            transform: scale(0.95);
+            transform: scale(0.94);
+            background: var(--panel-active);
+        }
+
+        /* Combo Toolbar */
+        .combo-toolbar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .combo-btn {
+            background: var(--panel-raised);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 10px 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: var(--text-main);
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+            transition: transform 0.08s ease;
+        }
+        .combo-btn:active {
+            transform: scale(0.94);
             background: var(--panel-active);
         }
 
@@ -364,15 +393,34 @@
             position: relative;
             overflow: hidden;
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
-            transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+            /* Ghost touch optimization: instant feedback */
+            transition: transform 0.08s ease, border-color 0.1s ease, background 0.1s ease, box-shadow 0.1s ease;
+            will-change: transform, background;
         }
         .appliance-tile:active {
-            transform: scale(0.95);
+            transform: scale(0.93);
         }
-        .appliance-tile.active {
-            background: #181d27;
-            border-color: rgba(255, 183, 0, 0.55);
-            box-shadow: 0 14px 32px var(--amber-glow);
+        
+        /* Individual active lighting glows */
+        .appliance-tile.active-1 {
+            background: #121d2b;
+            border-color: rgba(56, 189, 248, 0.6);
+            box-shadow: 0 14px 32px rgba(56, 189, 248, 0.25);
+        }
+        .appliance-tile.active-2 {
+            background: #112233;
+            border-color: rgba(56, 189, 248, 0.8);
+            box-shadow: 0 14px 32px rgba(56, 189, 248, 0.4);
+        }
+        .appliance-tile.active-3 {
+            background: #2a1218;
+            border-color: rgba(255, 42, 85, 0.8);
+            box-shadow: 0 14px 32px rgba(255, 42, 85, 0.4);
+        }
+        .appliance-tile.active-4 {
+            background: #10281b;
+            border-color: rgba(0, 230, 118, 0.8);
+            box-shadow: 0 14px 32px rgba(0, 230, 118, 0.4);
         }
 
         .tile-head {
@@ -391,20 +439,13 @@
             align-items: center;
             color: var(--text-muted);
             font-size: 1.4rem;
-            transition: all 0.15s ease;
+            transition: all 0.1s ease;
         }
-        .appliance-tile.active .tile-icon-box {
-            background: var(--amber-warm);
-            color: #06090e;
-            box-shadow: 0 0 18px rgba(255, 183, 0, 0.7);
-        }
-
-        .appliance-tile.active #fan-icon i {
-            animation: bladeRotate 0.65s linear infinite;
-        }
-        @keyframes bladeRotate {
-            100% { transform: rotate(360deg); }
-        }
+        
+        .appliance-tile.active-1 .tile-icon-box { background: var(--blue-light); color: #06090e; box-shadow: 0 0 18px rgba(56, 189, 248, 0.7); }
+        .appliance-tile.active-2 .tile-icon-box { background: var(--blue-light); color: #06090e; box-shadow: 0 0 18px rgba(56, 189, 248, 0.7); }
+        .appliance-tile.active-3 .tile-icon-box { background: var(--red-light); color: #fff; box-shadow: 0 0 18px rgba(255, 42, 85, 0.7); }
+        .appliance-tile.active-4 .tile-icon-box { background: var(--green-light); color: #06090e; box-shadow: 0 0 18px rgba(0, 230, 118, 0.7); }
 
         .tactile-switch {
             width: 50px;
@@ -413,7 +454,7 @@
             border: 1.5px solid var(--border-dim);
             border-radius: 20px;
             position: relative;
-            transition: all 0.15s ease;
+            transition: all 0.1s ease;
         }
         .tactile-knob {
             width: 20px;
@@ -423,17 +464,20 @@
             position: absolute;
             top: 2.5px;
             left: 3px;
-            transition: transform 0.15s ease, background 0.15s ease;
+            transition: transform 0.1s ease, background 0.1s ease;
         }
-        .appliance-tile.active .tactile-switch {
-            background: rgba(255, 183, 0, 0.22);
-            border-color: var(--amber-warm);
-        }
-        .appliance-tile.active .tactile-knob {
-            transform: translateX(22px);
-            background: var(--amber-warm);
-            box-shadow: 0 0 10px var(--amber-warm);
-        }
+        
+        .appliance-tile.active-1 .tactile-switch { background: rgba(56, 189, 248, 0.22); border-color: var(--blue-light); }
+        .appliance-tile.active-1 .tactile-knob { transform: translateX(22px); background: var(--blue-light); box-shadow: 0 0 10px var(--blue-light); }
+
+        .appliance-tile.active-2 .tactile-switch { background: rgba(56, 189, 248, 0.22); border-color: var(--blue-light); }
+        .appliance-tile.active-2 .tactile-knob { transform: translateX(22px); background: var(--blue-light); box-shadow: 0 0 10px var(--blue-light); }
+
+        .appliance-tile.active-3 .tactile-switch { background: rgba(255, 42, 85, 0.22); border-color: var(--red-light); }
+        .appliance-tile.active-3 .tactile-knob { transform: translateX(22px); background: var(--red-light); box-shadow: 0 0 10px var(--red-light); }
+
+        .appliance-tile.active-4 .tactile-switch { background: rgba(0, 230, 118, 0.22); border-color: var(--green-light); }
+        .appliance-tile.active-4 .tactile-knob { transform: translateX(22px); background: var(--green-light); box-shadow: 0 0 10px var(--green-light); }
 
         .tile-foot {
             display: flex;
@@ -441,7 +485,7 @@
             gap: 3px;
         }
         .tile-name {
-            font-size: 1.05rem;
+            font-size: 0.95rem;
             font-weight: 700;
             color: var(--text-head);
         }
@@ -453,9 +497,12 @@
             justify-content: space-between;
         }
         .tile-spec span.active-tag {
-            color: var(--amber-warm);
             font-weight: 700;
         }
+        .appliance-tile.active-1 .active-tag { color: var(--blue-light); }
+        .appliance-tile.active-2 .active-tag { color: var(--blue-light); }
+        .appliance-tile.active-3 .active-tag { color: var(--red-light); }
+        .appliance-tile.active-4 .active-tag { color: var(--green-light); }
 
         /* Companion & Telemetry */
         .companion-bar {
@@ -472,9 +519,10 @@
             align-items: center;
             gap: 10px;
             cursor: pointer;
+            transition: transform 0.08s ease;
         }
         .companion-card:active {
-            transform: scale(0.96);
+            transform: scale(0.95);
         }
         .companion-card i {
             font-size: 1.15rem;
@@ -584,55 +632,66 @@
         </div>
     </div>
 
+    <!-- Combination Lighting Toolbar -->
+    <div class="section-headline">
+        <h2>Lighting Combos</h2>
+        <span>MULTI-STATE</span>
+    </div>
+    <div class="combo-toolbar">
+        <div class="combo-btn" onclick="triggerCombo(3, 4)">🔴+🟢 GREEN & RED</div>
+        <div class="combo-btn" onclick="triggerCombo(3, 2)">🔴+🔵 RED & BLUE</div>
+        <div class="combo-btn" onclick="triggerCombo(4, 2)">🟢+🔵 GREEN & BLUE</div>
+    </div>
+
     <!-- Appliance Tiles Header -->
     <div class="section-headline">
         <h2>Appliance Controls</h2>
         <span id="active-summary">0 ACTIVE</span>
     </div>
 
-    <!-- 4 Touch Tiles -->
+    <!-- 4 Touch Tiles (Optimized for Ghost Touch Response) -->
     <div class="tiles-grid">
-        <div class="appliance-tile" id="tile-1" onclick="toggleRelay(1)">
+        <div class="appliance-tile" id="tile-1" ontouchstart="handleTouchStart(1)" onclick="toggleRelay(1)">
             <div class="tile-head">
                 <div class="tile-icon-box"><i class="fa-regular fa-lightbulb"></i></div>
                 <div class="tactile-switch"><div class="tactile-knob"></div></div>
             </div>
             <div class="tile-foot">
-                <div class="tile-name">Ceiling Light</div>
-                <div class="tile-spec"><span>GPIO 18</span><span class="active-tag" id="status-1">STANDBY</span></div>
+                <div class="tile-name">Desktop Under Light</div>
+                <div class="tile-spec"><span>RELAY 1</span><span class="active-tag" id="status-1">STANDBY</span></div>
             </div>
         </div>
 
-        <div class="appliance-tile" id="tile-2" onclick="toggleRelay(2)">
+        <div class="appliance-tile" id="tile-2" ontouchstart="handleTouchStart(2)" onclick="toggleRelay(2)">
             <div class="tile-head">
                 <div class="tile-icon-box"><i class="fa-solid fa-lightbulb"></i></div>
                 <div class="tactile-switch"><div class="tactile-knob"></div></div>
             </div>
             <div class="tile-foot">
-                <div class="tile-name">Reading Lamp</div>
-                <div class="tile-spec"><span>GPIO 19</span><span class="active-tag" id="status-2">STANDBY</span></div>
+                <div class="tile-name">Blue Light</div>
+                <div class="tile-spec"><span>RELAY 2</span><span class="active-tag" id="status-2">STANDBY</span></div>
             </div>
         </div>
 
-        <div class="appliance-tile" id="tile-3" onclick="toggleRelay(3)">
+        <div class="appliance-tile" id="tile-3" ontouchstart="handleTouchStart(3)" onclick="toggleRelay(3)">
             <div class="tile-head">
-                <div class="tile-icon-box" id="fan-icon"><i class="fa-solid fa-fan"></i></div>
+                <div class="tile-icon-box"><i class="fa-solid fa-lightbulb"></i></div>
                 <div class="tactile-switch"><div class="tactile-knob"></div></div>
             </div>
             <div class="tile-foot">
-                <div class="tile-name">High-Vel Fan</div>
-                <div class="tile-spec"><span>GPIO 21</span><span class="active-tag" id="status-3">STANDBY</span></div>
+                <div class="tile-name">Red Light</div>
+                <div class="tile-spec"><span>RELAY 3</span><span class="active-tag" id="status-3">STANDBY</span></div>
             </div>
         </div>
 
-        <div class="appliance-tile" id="tile-4" onclick="toggleRelay(4)">
+        <div class="appliance-tile" id="tile-4" ontouchstart="handleTouchStart(4)" onclick="toggleRelay(4)">
             <div class="tile-head">
-                <div class="tile-icon-box" id="tv-icon"><i class="fa-solid fa-tv"></i></div>
+                <div class="tile-icon-box"><i class="fa-solid fa-lightbulb"></i></div>
                 <div class="tactile-switch"><div class="tactile-knob"></div></div>
             </div>
             <div class="tile-foot">
-                <div class="tile-name">OLED Screen</div>
-                <div class="tile-spec"><span>GPIO 22</span><span class="active-tag" id="status-4">STANDBY</span></div>
+                <div class="tile-name">Green Light</div>
+                <div class="tile-spec"><span>RELAY 4</span><span class="active-tag" id="status-4">STANDBY</span></div>
             </div>
         </div>
     </div>
@@ -668,14 +727,14 @@
     <script>
         // 1. Fast Intro (0.6s) + Parallel MQTT Connect
         window.addEventListener('DOMContentLoaded', () => {
-            connectMQTT(); // Turant connect shuru karo, intro ka wait mat karo!
+            connectMQTT();
             setTimeout(() => {
                 const overlay = document.getElementById('intro-overlay');
                 if (overlay) overlay.classList.add('vanished');
             }, 600);
         });
 
-        // 2. High-Speed MQTT Pipeline (QoS 0 + Explicit "/mqtt" Path)
+        // 2. High-Speed MQTT Pipeline
         const MQTT_BROKER = "broker.emqx.io";
         const MQTT_PORT = 8084;
         const MQTT_PATH = "/mqtt";
@@ -685,15 +744,21 @@
         const CLIENT_ID = "emo_pad_" + Math.random().toString(16).substring(2, 10);
 
         const states = { 1: false, 2: false, 3: false, 4: false };
-        const lastLocalClick = { 1: 0, 2: 0, 3: 0, 4: 0 }; // Bounce back roke
+        const lastLocalClick = { 1: 0, 2: 0, 3: 0, 4: 0 };
         let mqttConnected = false;
         let packetCount = 0;
         let mqttClient = null;
 
         function triggerHaptic() {
             try {
-                if ("vibrate" in navigator) navigator.vibrate(20);
+                if ("vibrate" in navigator) navigator.vibrate(15);
             } catch (e) {}
+        }
+
+        // Ghost Touch instantaneous handler for ultra-snappy mobile feel
+        function handleTouchStart(id) {
+            // Pre-emptively toggle visually on touchstart for absolute 0ms perceived lag
+            triggerHaptic();
         }
 
         function triggerEmoReaction(type) {
@@ -722,10 +787,10 @@
             if (!tile) return;
 
             if (state) {
-                tile.classList.add('active');
+                tile.className = `appliance-tile active-${id}`;
                 if (statusLabel) statusLabel.innerText = "ONLINE";
             } else {
-                tile.classList.remove('active');
+                tile.className = 'appliance-tile';
                 if (statusLabel) statusLabel.innerText = "STANDBY";
             }
 
@@ -733,7 +798,7 @@
             const summary = document.getElementById('active-summary');
             if (summary) summary.innerText = `${activeCount} ACTIVE`;
 
-            if (states[1] || states[2]) {
+            if (states[1] || states[2] || states[3] || states[4]) {
                 document.body.classList.add('room-illuminated');
             } else {
                 document.body.classList.remove('room-illuminated');
@@ -742,13 +807,13 @@
 
         function publishFast(topic, payloadObj) {
             if (!mqttConnected || !mqttClient) {
-                setLog("OFFLINE - CLICK RETRY CHIP");
+                setLog("OFFLINE - TAP RETRY");
                 return false;
             }
             try {
                 const message = new Paho.MQTT.Message(JSON.stringify(payloadObj));
                 message.destinationName = topic;
-                message.qos = 0; // QoS 0 = Zero-lag instant fire!
+                message.qos = 0;
                 message.retained = false;
                 mqttClient.send(message);
 
@@ -763,18 +828,29 @@
         }
 
         function toggleRelay(id) {
-            triggerHaptic();
             const nextState = !states[id];
             lastLocalClick[id] = Date.now();
 
-            // Instant UI update
             updateCardUI(id, nextState);
             triggerEmoReaction(nextState ? 'happy' : 'wink');
 
-            // Instant MQTT send
             if (publishFast(TOPIC_RELAY, { id: Number(id), state: nextState ? 1 : 0 })) {
-                setLog(`SENT CH-0${id} -> ${nextState ? 'ON' : 'OFF'}`);
+                setLog(`SENT RELAY ${id} -> ${nextState ? 'ON' : 'OFF'}`);
             }
+        }
+
+        function triggerCombo(id1, id2) {
+            triggerHaptic();
+            triggerEmoReaction('happy');
+            
+            // Turn both ON simultaneously
+            setTimeout(() => {
+                if (!states[id1]) { lastLocalClick[id1] = Date.now(); updateCardUI(id1, true); publishFast(TOPIC_RELAY, { id: id1, state: 1 }); }
+            }, 0);
+            setTimeout(() => {
+                if (!states[id2]) { lastLocalClick[id2] = Date.now(); updateCardUI(id2, true); publishFast(TOPIC_RELAY, { id: id2, state: 1 }); }
+            }, 30);
+            setLog(`COMBO ACTIVE: R${id1} & R${id2}`);
         }
 
         function masterControl(turnOn) {
@@ -782,12 +858,11 @@
             triggerEmoReaction(turnOn ? 'happy' : 'surprised');
             for (let i = 1; i <= 4; i++) {
                 if (states[i] !== turnOn) {
-                    // 40ms stagger taaki ESP32 ESP-NOW par ek sath 4 packet drop na kare
                     setTimeout(() => {
                         lastLocalClick[i] = Date.now();
                         updateCardUI(i, turnOn);
                         publishFast(TOPIC_RELAY, { id: i, state: turnOn ? 1 : 0 });
-                    }, (i - 1) * 40);
+                    }, (i - 1) * 30);
                 }
             }
             setLog(`MASTER -> ALL ${turnOn ? 'ON' : 'OFF'}`);
@@ -808,7 +883,7 @@
 
         function connectMQTT() {
             if (typeof Paho === 'undefined' || !Paho.MQTT) {
-                setLog("MQTT LIB ERROR - CHECK INTERNET");
+                setLog("MQTT LIB ERROR");
                 return;
             }
 
@@ -817,7 +892,6 @@
                     try { mqttClient.disconnect(); } catch (e) {}
                 }
 
-                // Explicit "/mqtt" path fixes WebSocket delay on EMQX
                 mqttClient = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), MQTT_PATH, CLIENT_ID);
 
                 mqttClient.onMessageArrived = function (message) {
@@ -826,7 +900,6 @@
                         const id = Number(data.id);
                         const state = (Number(data.state) === 1);
 
-                        // Agar abhi 600ms ke andar humne khud button dabaya hai toh old retained echo ignore karo
                         if (Date.now() - (lastLocalClick[id] || 0) < 600 && state === states[id]) {
                             return;
                         }
@@ -835,7 +908,7 @@
                         packetCount++;
                         const counter = document.getElementById('packet-counter');
                         if (counter) counter.innerText = packetCount;
-                        setLog(`ESP32 SYNC CH-0${id} [${state ? 'ON' : 'OFF'}]`);
+                        setLog(`SYNC R${id} [${state ? 'ON' : 'OFF'}]`);
                     } catch (e) {}
                 };
 
@@ -851,13 +924,11 @@
                     setTimeout(connectMQTT, 2500);
                 };
 
-                const isHttps = window.location.protocol === 'https:';
-
                 mqttClient.connect({
-                    useSSL: true, // EMQX 8084 uses WSS (TLS)
+                    useSSL: true,
                     timeout: 4,
                     keepAliveInterval: 25,
-                    cleanSession: true, // Fast handshake without old queue lag!
+                    cleanSession: true,
                     onSuccess: function () {
                         mqttConnected = true;
                         const chip = document.getElementById('conn-chip');
@@ -866,7 +937,7 @@
                             chip.className = 'live-chip connected';
                             text.innerText = "CONNECTED";
                         }
-                        setLog("EMQX LIVE! 0ms Instant Relay Ready.");
+                        setLog("EMQX LIVE! Instant Relay Ready.");
                         try {
                             mqttClient.subscribe(TOPIC_STATUS_WILDCARD, { qos: 0 });
                         } catch (e) {}
