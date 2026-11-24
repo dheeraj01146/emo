@@ -26,10 +26,18 @@ inline lv_obj_t* BootObj(lv_obj_t* parent, lv_coord_t w, lv_coord_t h,
     return o;
 }
 
+/* Helper: dono eyes ek saath control (dx, dy = offset, h = height) */
+inline void SetEyes(lv_obj_t* el, lv_obj_t* er, int dx, int dy, int h) {
+    lv_obj_set_size(el, 46, h);
+    lv_obj_align(el, LV_ALIGN_CENTER, -30 + dx, -15 + dy);
+    lv_obj_set_size(er, 46, h);
+    lv_obj_align(er, LV_ALIGN_CENTER, 30 + dx, -15 + dy);
+}
+
 inline void RunEmoBootAnimation(Display* display) {
     if (display == nullptr) return;
 
-    ESP_LOGI(BOOT_TAG, "Running EMO WAKE-UP Boot Sequence...");
+    ESP_LOGI(BOOT_TAG, "Running EMO WAKE-UP v2 — ALIVE EYES!");
 
     lv_obj_t* prev_scr = lv_scr_act();
 
@@ -61,51 +69,94 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_obj_del(spark);
     lvgl_port_unlock();
 
-    /* ---------- PHASE 2: EYES OPENING (Wake-Up!) ---------- */
+    /* ---------- PHASE 2: EYES WAKE-UP PERFORMANCE ---------- */
     lvgl_port_lock(0);
     lv_obj_t* eye_l = BootObj(boot_scr, 46, 2, 0x00E5FF, LV_RADIUS_CIRCLE);
-    lv_obj_align(eye_l, LV_ALIGN_CENTER, -30, -15);
     lv_obj_t* eye_r = BootObj(boot_scr, 46, 2, 0x00E5FF, LV_RADIUS_CIRCLE);
-    lv_obj_align(eye_r, LV_ALIGN_CENTER, 30, -15);
-    // Glow chahiye to (thoda performance lagega):
-    // lv_obj_set_style_shadow_width(eye_l, 20, 0);
-    // lv_obj_set_style_shadow_color(eye_l, lv_color_hex(0x00E5FF), 0);
-    // lv_obj_set_style_shadow_spread(eye_l, 4, 0);
+    SetEyes(eye_l, eye_r, 0, 0, 2);
     lvgl_port_unlock();
 
-    // Eyelids dheere-dheere khul rahi hain
+    // (a) Eyes khul rahi hain
     for (int h = 2; h <= 46; h += 4) {
         lvgl_port_lock(0);
-        lv_obj_set_size(eye_l, 46, h);
-        lv_obj_align(eye_l, LV_ALIGN_CENTER, -30, -15);
-        lv_obj_set_size(eye_r, 46, h);
-        lv_obj_align(eye_r, LV_ALIGN_CENTER, 30, -15);
+        SetEyes(eye_l, eye_r, 0, 0, h);
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(30));
     }
-    vTaskDelay(pdMS_TO_TICKS(350));
+    vTaskDelay(pdMS_TO_TICKS(300));
 
-    // Ek blink — jaise abhi jaaga hai
+    // (b) Ek normal blink (dono saath mein)
     for (int h = 46; h >= 4; h -= 7) {
         lvgl_port_lock(0);
-        lv_obj_set_size(eye_l, 46, h);
-        lv_obj_align(eye_l, LV_ALIGN_CENTER, -30, -15);
-        lv_obj_set_size(eye_r, 46, h);
-        lv_obj_align(eye_r, LV_ALIGN_CENTER, 30, -15);
+        SetEyes(eye_l, eye_r, 0, 0, h);
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(20));
     }
     for (int h = 4; h <= 46; h += 7) {
         lvgl_port_lock(0);
-        lv_obj_set_size(eye_l, 46, h);
-        lv_obj_align(eye_l, LV_ALIGN_CENTER, -30, -15);
+        SetEyes(eye_l, eye_r, 0, 0, h);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    vTaskDelay(pdMS_TO_TICKS(250));
+
+    // (c) Curious glance — LEFT... RIGHT... (nayi duniya dekh raha hai 👀)
+    for (int dx = 0; dx >= -10; dx -= 2) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, dx, 0, 46);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+    vTaskDelay(pdMS_TO_TICKS(280));
+    for (int dx = -10; dx <= 10; dx += 2) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, dx, 0, 46);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+    vTaskDelay(pdMS_TO_TICKS(280));
+    for (int dx = 10; dx >= 0; dx -= 2) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, dx, 0, 46);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    // (d) THE WINK — right eye AKELI blink karegi!
+    for (int h = 46; h >= 2; h -= 4) {
+        lvgl_port_lock(0);
         lv_obj_set_size(eye_r, 46, h);
         lv_obj_align(eye_r, LV_ALIGN_CENTER, 30, -15);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+    for (int h = 2; h <= 46; h += 4) {
+        lvgl_port_lock(0);
+        lv_obj_set_size(eye_r, 46, h);
+        lv_obj_align(eye_r, LV_ALIGN_CENTER, 30, -15);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+    vTaskDelay(pdMS_TO_TICKS(250));
+
+    // (e) Happy squint — dono eyes smile style ^ ^
+    for (int h = 46; h >= 10; h -= 9) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, 0, 0, h);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    vTaskDelay(pdMS_TO_TICKS(150));
+    for (int h = 10; h <= 46; h += 9) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, 0, 0, h);
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 
-    /* ---------- PHASE 3: RADAR PING RINGS ---------- */
+    /* ---------- PHASE 3: RADAR PING + EYE BREATHING ---------- */
     lvgl_port_lock(0);
     lv_obj_t* ring1 = lv_obj_create(boot_scr);
     lv_obj_set_size(ring1, 10, 10);
@@ -136,6 +187,9 @@ inline void RunEmoBootAnimation(Display* display) {
         lv_obj_set_size(ring2, s2, s2);
         lv_obj_align(ring2, LV_ALIGN_CENTER, 0, -15);
         lv_obj_set_style_border_opa(ring2, 255 - (s2 * 255 / 150), 0);
+
+        // Eyes gently breathe — freeze nahi lagega
+        SetEyes(eye_l, eye_r, 0, 0, ((s / 10) % 2) ? 42 : 46);
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(30));
     }
@@ -144,23 +198,23 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_obj_del(ring2);
     lvgl_port_unlock();
 
-    /* ---------- PHASE 4: TYPING "EMO" + GLITCH ---------- */
+    /* ---------- PHASE 4: TYPING "EMO" — EYES READING ---------- */
     lvgl_port_lock(0);
     lv_obj_t* emo_txt = lv_label_create(boot_scr);
     lv_label_set_text(emo_txt, "");
     lv_obj_set_style_text_color(emo_txt, lv_color_hex(0x00E5FF), 0);
-    // Bada font chahiye to (menuconfig mein LV_FONT_MONTSERRAT_24 enable karke):
-    // lv_obj_set_style_text_font(emo_txt, &lv_font_montserrat_24, 0);
     lv_obj_align(emo_txt, LV_ALIGN_CENTER, 0, 45);
     lvgl_port_unlock();
 
     char buf[20];
     const char* name = "EMO";
+    const int read_dx[3] = {-6, 0, 6};   // eyes letters ko follow karein
     for (int i = 1; i <= 3; i++) {
         snprintf(buf, sizeof(buf), "%.*s_", i, name);
         lvgl_port_lock(0);
         lv_label_set_text(emo_txt, buf);
         lv_obj_align(emo_txt, LV_ALIGN_CENTER, 0, 45);
+        SetEyes(eye_l, eye_r, read_dx[i - 1], 8, 46);  // neeche dekh raha hai
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(150));
     }
@@ -175,11 +229,12 @@ inline void RunEmoBootAnimation(Display* display) {
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(120));
     }
-    // GLITCH — hacker vibe
+    // GLITCH — eyes bhi shake karein
     for (int g = 0; g < 6; g++) {
         lvgl_port_lock(0);
         lv_obj_set_style_text_color(emo_txt, (g % 2) ? lv_color_white() : lv_color_hex(0xFF2255), 0);
         lv_obj_align(emo_txt, LV_ALIGN_CENTER, (g % 2) ? 3 : -3, 45);
+        SetEyes(eye_l, eye_r, (g % 2) ? 3 : -3, 8, 46);
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(45));
     }
@@ -187,9 +242,10 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_label_set_text(emo_txt, "EMO");
     lv_obj_set_style_text_color(emo_txt, lv_color_hex(0x00E5FF), 0);
     lv_obj_align(emo_txt, LV_ALIGN_CENTER, 0, 45);
+    SetEyes(eye_l, eye_r, 0, 8, 46);
     lvgl_port_unlock();
 
-    /* ---------- PHASE 5: SUBTITLE + AUTHOR ---------- */
+    /* ---------- PHASE 5: SUBTITLE + AUTHOR (TOP-RIGHT FIX) ---------- */
     lvgl_port_lock(0);
     lv_obj_t* sub = lv_label_create(boot_scr);
     lv_label_set_text(sub, "AI ROBOT");
@@ -199,10 +255,10 @@ inline void RunEmoBootAnimation(Display* display) {
     lv_obj_t* author = lv_label_create(boot_scr);
     lv_label_set_text(author, "POWERED BY DHEERAJ");
     lv_obj_set_style_text_color(author, lv_color_hex(0x00E5FF), 0);
-    lv_obj_align(author, LV_ALIGN_BOTTOM_RIGHT, -20, -15);
+    lv_obj_align(author, LV_ALIGN_TOP_RIGHT, -10, 8);
     lvgl_port_unlock();
 
-    /* ---------- PHASE 6: LOADING BAR 0 -> 100% ---------- */
+    /* ---------- PHASE 6: LOADING BAR — EYES FOLLOW KARTI HAIN ---------- */
     lvgl_port_lock(0);
     lv_obj_t* bar_bg = BootObj(boot_scr, 180, 8, 0x0A1A2A, 4);
     lv_obj_align(bar_bg, LV_ALIGN_CENTER, 0, 92);
@@ -221,12 +277,34 @@ inline void RunEmoBootAnimation(Display* display) {
         snprintf(buf, sizeof(buf), "BOOTING %d%%", p);
         lv_label_set_text(pct_lbl, buf);
         lv_obj_align(pct_lbl, LV_ALIGN_CENTER, 0, 110);
+        SetEyes(eye_l, eye_r, (p - 50) / 4, 8, 46);   // eyes bar track karti hain!
         lvgl_port_unlock();
         vTaskDelay(pdMS_TO_TICKS(35));
     }
-    vTaskDelay(pdMS_TO_TICKS(600));
 
-    /* ---------- PHASE 7: WHITE FLASH + HANDOVER ---------- */
+    // Hold ke dauran ek slow satisfied blink
+    for (int h = 46; h >= 6; h -= 8) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, 0, 8, h);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(40));
+    }
+    for (int h = 6; h <= 46; h += 8) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, 0, 8, h);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(40));
+    }
+
+    /* ---------- PHASE 7: FINAL SMILE + WHITE FLASH ---------- */
+    // Flash se pehle dono eyes happy squint — "smile" 😊
+    for (int h = 46; h >= 10; h -= 9) {
+        lvgl_port_lock(0);
+        SetEyes(eye_l, eye_r, 0, 8, h);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+
     lvgl_port_lock(0);
     lv_obj_t* flash = lv_obj_create(boot_scr);
     lv_obj_set_size(flash, 320, 240);
